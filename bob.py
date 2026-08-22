@@ -479,18 +479,20 @@ Create a NEW, simpler plan that avoids this error. Use different packages if nee
 Return a JSON object with the new plan:
 {{
   "framework": "{old_plan.get('framework', 'react')}",
-  "install_command": "npm install or empty",
-  "build_command": "npm run build or empty",
-  "files": [
-    {{"path": "path/to/file", "description": "what this file does"}}
-  ]
+  "install_command": "npm install",
+  "build_command": "npm run build",
+  "architecture": "Brief description",
+  "components": [{{"name": "comp", "description": "what it does", "files": [{{"path": "...", "description": "..."}}]}}],
+  "config_files": [{{"path": "package.json", "description": "deps"}}],
+  "files": [{{"path": "src/main.tsx", "description": "entry"}}]
 }}
 
 IMPORTANT:
 - Fix the error described above
-- Use fewer, simpler dependencies
-- Keep it under 10 files
-- All dependencies must exist on npm and be compatible
+- Use fewer, simpler dependencies (max 3-4 npm packages)
+- Keep it under 10 files total
+- All dependencies must exist on npm with exact compatible versions
+- Do NOT include title/description/features in the JSON (they are passed separately)
 """
 
     problems = get_problems()
@@ -734,6 +736,10 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
             if attempt < 3:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
                 new_plan = replan_with_error(plan, error, project_name)
+                # Carry over metadata from original plan
+                new_plan["title"] = plan.get("title", project_name)
+                new_plan["description"] = plan.get("description", "")
+                new_plan["features"] = plan.get("features", [])
                 save_project_files(project_name, new_plan, attempt + 1)
                 return
             else:
@@ -749,6 +755,9 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
             if attempt < 3:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
                 new_plan = replan_with_error(plan, error, project_name)
+                new_plan["title"] = plan.get("title", project_name)
+                new_plan["description"] = plan.get("description", "")
+                new_plan["features"] = plan.get("features", [])
                 save_project_files(project_name, new_plan, attempt + 1)
                 return
             else:
@@ -1065,7 +1074,18 @@ def main():
         log.info("📦 Found uncommitted changes, pushing first...")
         push_changes("Bob startup: pushing pending changes")
 
-    # 3. Build immediately
+    # 3. Auto-rework failed projects
+    failed = get_failed_projects()
+    if failed:
+        log.info(f"🔄 Found {len(failed)} failed project(s), reworking...")
+        for p in failed:
+            try:
+                rework_project(p)
+                push_changes(f"Reworked: {p['title']}")
+            except Exception as e:
+                log.error(f"❌ Rework failed for {p['name']}: {e}")
+
+    # 4. Build new project
     build_project()
 
     # 4. Loop — Bob pushes whenever he wants, guaranteed push every hour

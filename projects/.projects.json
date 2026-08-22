@@ -9,7 +9,9 @@
       "Sentiment analysis via Vercel AI SDK",
       "Real-time data streaming dashboard"
     ],
-    "built_at": "2026-08-23T00:30:05.731500"
+    "built_at": "2026-08-23T00:30:05.731500",
+    "status": "error",
+    "error": "Next.js build failed - missing 'use client' directive and other issues. Needs rework."
   },
   {
     "name": "orbit-focus",
@@ -22,9 +24,21 @@
       "Local-first data persistence using IndexedDB"
     ],
     "built_at": "2026-08-23T00:39:06.062571",
-    "status": "complete",
-    "files_done": 0,
-    "files_total": 0,
-    "updated_at": "2026-08-23T00:40:30.779573"
+    "status": "error",
+    "error": "Next.js build failed - missing 'use client' directive in components using hooks. Needs rework."
+  },
+  {
+    "name": "chroma-chord",
+    "title": "Chroma Chord",
+    "description": "An interactive web synthesizer that translates color palettes into generative ambient soundscapes using the Web Audio API.",
+    "framework": "svelte",
+    "features": [
+      "Color picker interface that maps hex values to frequency oscillators",
+      "Real-time generation of evolving ambient textures",
+      "Shareable palette URLs that regenerate the same audio session"
+    ],
+    "built_at": "2026-08-23T00:51:12.250374",
+    "status": "error",
+    "error": "Vite build failed - could not resolve './app.css' from 'src/main.ts'. Missing CSS file in project structure."
   }
 ]

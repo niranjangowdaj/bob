@@ -164,9 +164,11 @@ Each project is self-contained in its own subdirectory under `projects/`.
 ## Commands
 
 ```bash
-python bob.py           # Normal mode: build new projects
-python bob.py --rework  # Rework all failed projects
+python bob.py           # Normal: auto-reworks failures, then builds new
+python bob.py --rework  # Only rework failed projects, skip new builds
 ```
+
+**Bob auto-detects failed projects on startup** and reworks them before building new ones.
 
 ## How Bob Builds (Nested Planning)
 
