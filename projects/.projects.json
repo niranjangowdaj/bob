@@ -10,5 +10,21 @@
       "Real-time data streaming dashboard"
     ],
     "built_at": "2026-08-23T00:30:05.731500"
+  },
+  {
+    "name": "orbit-focus",
+    "title": "Orbit Focus",
+    "description": "A productivity timer that visualizes tasks as orbital bodies, where focus sessions keep your projects in a stable gravity field.",
+    "framework": "nextjs",
+    "features": [
+      "Web Audio API integration for ambient focus soundscapes",
+      "Canvas-based gravity simulation for task visualization",
+      "Local-first data persistence using IndexedDB"
+    ],
+    "built_at": "2026-08-23T00:39:06.062571",
+    "status": "complete",
+    "files_done": 11,
+    "files_total": 11,
+    "updated_at": "2026-08-23T00:40:26.923187"
   }
 ]
