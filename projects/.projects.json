@@ -15,5 +15,21 @@
     "files_total": 0,
     "updated_at": "2026-08-23T01:35:52.696822",
     "error": "'NoneType' object is not subscriptable"
+  },
+  {
+    "name": "flow-state-tuner",
+    "title": "Flow State Tuner",
+    "description": "A browser-based ambient sound generator that dynamically modulates binaural beats and white noise frequencies based on your mouse movement speed to keep you in the zone.",
+    "framework": "vite",
+    "features": [
+      "Web Audio API integration for real-time sound synthesis",
+      "Dynamic modulation curves based on UI interaction",
+      "Zero-latency audio buffer processing"
+    ],
+    "built_at": "2026-08-23T01:35:59.770612",
+    "status": "complete",
+    "files_done": 1,
+    "files_total": 1,
+    "updated_at": "2026-08-23T01:36:57.905076"
   }
 ]

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow State Tuner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --accent: #6366f1;
+            --text: #e2e8f0;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.3; }
+        .ui { position: relative; z-index: 1; text-align: center; pointer-events: none; }
+        h1 { font-weight: 300; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; }
+        button {
+            pointer-events: auto;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        button:hover { background: var(--accent); color: white; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="ui">
+        <h1>Flow State Tuner</h1>
+        <button id="startBtn">Initialize Audio</button>
+        <p id="status">Move your mouse to modulate frequency</p>
+    </div>
+
+    <script>
+        let audioCtx, oscLeft, oscRight, gainNode, noiseNode;
+        let isRunning = false;
+        let lastX = 0, lastY = 0, speed = 0;
+
+        const startBtn = document.getElementById('startBtn');
+        const status = document.getElementById('status');
+
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Binaural Beat Oscillators
+            oscLeft = audioCtx.createOscillator();
+            oscRight = audioCtx.createOscillator();
+            const pannerLeft = audioCtx.createStereoPanner();
+            const pannerRight = audioCtx.createStereoPanner();
+            
+            pannerLeft.pan.value = -1;
+            pannerRight.pan.value = 1;
+            
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.1;
+
+            oscLeft.connect(pannerLeft).connect(gainNode);
+            oscRight.connect(pannerRight).connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscLeft.frequency.value = 200;
+            oscRight.frequency.value = 200;
+            
+            oscLeft.start();
+            oscRight.start();
+            isRunning = true;
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isRunning) return;
+            
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            speed = Math.sqrt(dx * dx + dy * dy);
+            
+            const baseFreq = 200;
+            const modulation = Math.min(speed * 2, 50);
+            
+            oscLeft.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.1);
+            oscRight.frequency.setTargetAtTime(baseFreq + modulation, audioCtx.currentTime, 0.1);
+            
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (!isRunning) {
+                initAudio();
+                startBtn.textContent = "Audio Active";
+                startBtn.style.borderColor = "#10b981";
+                startBtn.style.color = "#10b981";
+            }
+        });
+
+        // Visuals
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize;
+        resize();
+        
+        function draw() {
+            ctx.fillStyle = 'rgba(10, 10, 12, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#6366f1';
+            ctx.beginPath();
+            ctx.arc(lastX, lastY, speed, 0, Math.PI * 2);
+            ctx.stroke();
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>
