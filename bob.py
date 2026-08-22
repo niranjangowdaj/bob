@@ -278,90 +278,65 @@ export default function App() {{
 
 
 def build_html_project(project_dir, title, customization):
-    """Build a plain HTML project."""
-    accent = customization.get("accent_color", "#4ade80")
-    description = customization.get("description", "")
-    sections = customization.get("sections", [])
+    """Build a plain HTML project with AI-generated content."""
+    body_content = customization.get("html", "")
+    css = customization.get("css", "")
     js_code = customization.get("javascript", "")
 
-    sections_html = ""
-    for s in sections:
-        stitle = s.get("title", "")
-        scontent = s.get("content", "")
-        sections_html += f'''    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
-      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:{accent}">{stitle}</h2>
-      <p style="color:#888;line-height:1.6">{scontent}</p>
-    </section>
-'''
-
-    if not sections_html:
-        sections_html = f'''    <section style="background:#141414;border-radius:12px;padding:2rem">
-      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:{accent}">{title}</h2>
-      <p style="color:#888;line-height:1.6">{description}</p>
-    </section>
-'''
-
-    title_parts = title.split()
-    main_word = title_parts[0] if title_parts else "App"
-    rest_words = " ".join(title_parts[1:]) if len(title_parts) > 1 else ""
-
-    html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {{ --bg: #0a0a0a; --surface: #141414; --text: #e0e0e0; --text-dim: #888; --accent: {accent}; }}
-    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-    body {{ font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
-  </style>
-</head>
-<body>
-  <div style="max-width:900px;margin:0 auto;padding:2rem">
-    <header style="text-align:center;margin-bottom:3rem">
-      <h1 style="font-size:2.5rem;font-weight:700">
-        <span style="color:{accent}">{main_word}</span> {rest_words}
-      </h1>
-      <p style="color:#888;margin-top:0.5rem">{description}</p>
-    </header>
-    <main>
-{sections_html}
-    </main>
-    <footer style="text-align:center;margin-top:3rem;color:#555;font-size:0.85rem">
-      Built by Bob
-    </footer>
-  </div>
-  <script>
-{js_code}
-  </script>
-</body>
-</html>'''
+    html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+    html += '  <meta charset="UTF-8">\n'
+    html += '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    html += '  <title>' + title + '</title>\n'
+    html += '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">\n'
+    html += '  <style>\n'
+    html += '    :root { --bg: #0a0a0a; --surface: #141414; --text: #e0e0e0; --dim: #888; --accent: #4ade80; }\n'
+    html += '    * { margin: 0; padding: 0; box-sizing: border-box; }\n'
+    html += '    body { font-family: "Inter", system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }\n'
+    html += '    ' + css + '\n'
+    html += '  </style>\n'
+    html += '</head>\n<body>\n'
+    html += body_content + '\n'
+    html += '  <script>\n' + js_code + '\n  </script>\n'
+    html += '</body>\n</html>'
 
     (project_dir / "index.html").write_text(html)
 
 
 # ─── AI ──────────────────────────────────────────────────────────────────
 
-CUSTOMIZE_PROMPT = """You are Bob. Generate customization for this website:
+CUSTOMIZE_PROMPT = """You are Bob, an autonomous website builder.
+Build this website as a SINGLE index.html file with inline CSS and JS.
 
 Title: {title}
 Description: {description}
 Features: {features}
 
-Return JSON:
+Return a JSON object:
 {{
-  "accent_color": "#hex color",
-  "sections": [{{"title": "Section", "content": "2-3 sentence paragraph"}}],
-  "features_list": ["feature 1", "feature 2"],
-  "javascript": "Optional JS for interactivity (animations, counters, toggles)"
+  "html": "the full HTML body content (inside <body> tags, NO <html>, <head>, <body> wrappers)",
+  "css": "additional CSS styles (inside <style> tag content)",
+  "javascript": "JavaScript code for interactivity"
 }}
 
-Rules:
-- 2-4 sections with good copy
-- JavaScript adds REAL interactivity (not just alerts)
-- Make it visually appealing
+The html field should contain:
+- A header with the title
+- The main content (forms, canvases, interactive elements, etc)
+- All the actual UI
+
+The css field should contain:
+- Modern dark theme styles
+- Responsive design
+- Animations and transitions
+- Component styles
+
+The javascript field should contain:
+- REAL interactivity (not placeholder)
+- Event handlers
+- State management
+- Animations
+
+Make it a COMPLETE, FUNCTIONAL website. Not just text sections.
+This should look and work like a real product, not a demo.
 """
 
 
