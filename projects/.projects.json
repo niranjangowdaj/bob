@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "name": "echo-chamber-viz",
+    "title": "Echo Chamber Visualizer",
+    "description": "An interactive data visualization tool that maps your social media feed topics to detect cognitive bias and bubble entrapment.",
+    "framework": "nextjs",
+    "features": [
+      "D3.js force-directed graph for cluster analysis",
+      "NLP sentiment and diversity scoring",
+      "Privacy-first local processing via browser-based WASM"
+    ],
+    "built_at": "2026-08-23T01:29:25.983439",
+    "status": "error",
+    "files_done": 0,
+    "files_total": 0,
+    "updated_at": "2026-08-23T01:30:23.793321",
+    "error": "'NoneType' object is not subscriptable"
+  }
+]

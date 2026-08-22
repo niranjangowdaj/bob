@@ -143,13 +143,31 @@ def _openrouter_call(prompt: str, temperature: float = 0.7) -> str:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
             )
-            return response.choices[0].message.content.strip()
+            content = response.choices[0].message.content
+            return (content or "").strip()
         except Exception as e:
             if "429" in str(e):
                 log.warning(f"⏳ {model} rate limited, trying next...")
                 continue
             raise
     raise Exception("All OpenRouter models exhausted")
+
+
+def _clean_text(text: str) -> str:
+    """Clean AI response text - handle None and markdown."""
+    if not text:
+        return ""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("```")
+        for part in text:
+            part = part.strip()
+            for lang in ["json", "html", "css", "javascript", "typescript"]:
+                if part.startswith(lang):
+                    part = part[len(lang):].strip()
+            if len(part) > 50:
+                return part
+    return text
 
 
 def _api_call(prompt: str, temperature: float = 0.7) -> str:
@@ -643,13 +661,11 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
         update_project_status(project_name, "in_progress", i + 1, total_files)
 
     # Install dependencies
-    install_cmd = plan.get("install_command", "")
-    if install_cmd:
-        log.info(f"📥 Installing: {install_cmd}")
-        env = os.environ.copy()
-        env["CI"] = "true"
-        success, error = _run_command(install_cmd, project_dir, env)
-        if not success:
+    log.info("📥 Installing dependencies...")
+    env = os.environ.copy()
+    env["CI"] = "true"
+    success, error = _run_command("npm install", project_dir, env)
+    if not success:
             log.error(f"❌ npm install failed:\n{error}")
             if attempt < 5:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
@@ -664,11 +680,9 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
                 raise Exception(f"Build failed after 5 attempts: {error[:200]}")
 
     # Build
-    build_cmd = plan.get("build_command", "")
-    if build_cmd:
-        log.info(f"🔨 Building: {build_cmd}")
-        success, error = _run_command(build_cmd, project_dir)
-        if not success:
+    log.info("🔨 Building...")
+    success, error = _run_command("npm run build", project_dir)
+    if not success:
             log.error(f"❌ npm build failed:\n{error}")
             if attempt < 5:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")

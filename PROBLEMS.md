@@ -17,6 +17,8 @@ Bob reads this on startup and avoids ALL of these issues.
 - tsconfig.json MUST have "strict": false to avoid type errors.
 - index.html must NOT have complex data: URIs in favicon (causes "URI malformed" error). Use a simple favicon or none.
 - Do NOT use path aliases (@/) in imports - use relative paths instead (e.g. "../components/Foo").
+- NEVER use "next build" directly - use "npx next build" or "npm run build" (next must be in devDependencies).
+- package.json build script must be "vite build" or "next build" - Bob always runs "npm run build".
 
 ## GitHub Pages Issues
 
