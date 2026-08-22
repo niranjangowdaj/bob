@@ -57,5 +57,18 @@
     ],
     "built_at": "2026-08-23T01:52:36.551185",
     "status": "complete"
+  },
+  {
+    "name": "syntax-swap-playground",
+    "title": "Syntax Swap Playground",
+    "description": "An interactive educational tool that lets developers paste code in one programming language and instantly see the equivalent logic translated into another side-by-side.",
+    "framework": "react",
+    "features": [
+      "Real-time syntax conversion engine",
+      "Side-by-side diff highlighting",
+      "Save and export code snippets as shareable links"
+    ],
+    "built_at": "2026-08-23T01:57:11.363554",
+    "status": "in_progress"
   }
 ]
