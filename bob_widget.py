@@ -29,7 +29,19 @@ def read_status() -> dict:
     if STATUS_FILE.exists():
         try:
             with open(STATUS_FILE) as f:
-                return json.load(f)
+                status = json.load(f)
+            # Check if status is stale (older than 2 minutes)
+            updated = status.get("updated_at", "")
+            if updated:
+                try:
+                    dt = datetime.fromisoformat(updated)
+                    age = (datetime.now() - dt).total_seconds()
+                    if age > 120 and status.get("state") in ("building", "thinking", "pushing"):
+                        status["state"] = "error"
+                        status["message"] = "Bob appears to have crashed"
+                except ValueError:
+                    pass
+            return status
         except (json.JSONDecodeError, IOError):
             pass
     return {

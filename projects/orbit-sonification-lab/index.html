@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Orbit Sonification Lab — Celestial Audio & 3D Gravitational Resonance</title>
+    <meta name="title" content="Orbit Sonification Lab — Celestial Audio & 3D Gravitational Resonance" />
+    <meta name="description" content="An interactive 3D celestial playground that translates planetary orbits and gravitational resonance into generative ambient soundscapes." />
+    <meta name="theme-color" content="#030712" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Orbit Sonification Lab — Celestial Audio & 3D Gravitational Resonance" />
+    <meta property="og:description" content="Translate real-time 3D planetary physics and orbital harmonies into generative ambient soundscapes." />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content="Orbit Sonification Lab" />
+    <meta property="twitter:description" content="An interactive 3D celestial playground mapping planetary orbital resonance into ambient generative music." />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='%236366f1'/><stop offset='100%' stop-color='%230b0f19'/></radialGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23g)'/><ellipse cx='50' cy='50' rx='38' ry='14' fill='none' stroke='%2338bdf8' stroke-width='2.5' transform='rotate(-25 50 50)'/><circle cx='76' cy='39' r='6' fill='%23ec4899'/></svg>" />
+
+    <!-- Preconnect to Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+      /* Immediate loading state background to avoid flash */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #030712;
+        color: #f3f4f6;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

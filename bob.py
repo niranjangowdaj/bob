@@ -54,14 +54,19 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 def set_status(state: str, message: str = ""):
     """Write status for the menu bar widget."""
-    status = {
-        "state": state,
-        "message": message,
-        "updated_at": datetime.now().isoformat(),
-    }
-    STATUS_FILE.parent.mkdir(exist_ok=True)
-    with open(STATUS_FILE, "w") as f:
-        json.dump(status, f)
+    try:
+        status = {
+            "state": state,
+            "message": message,
+            "updated_at": datetime.now().isoformat(),
+        }
+        STATUS_FILE.parent.mkdir(exist_ok=True)
+        with open(STATUS_FILE, "w") as f:
+            json.dump(status, f)
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception:
+        pass  # don't crash if status write fails
     log.info(f"[STATUS] {state}: {message}")
 
 
@@ -96,14 +101,85 @@ def _extract_json(text: str) -> dict:
         return json.loads(text[start:end+1])
     raise json.JSONDecodeError("No JSON found in response", text, 0)
 
+# Model pool: Gemini free tier + OpenRouter free models
+GEMINI_MODEL = "gemini-3.1-flash-lite"
+OPENROUTER_MODELS = [
+    "google/gemma-4-31b-it:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "z-ai/glm-5.2:free",
+    "cohere/north-mini-code:free",
+]
+
+# OpenRouter client (optional)
+or_client = None
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+if OPENROUTER_KEY:
+    from openai import OpenAI
+    or_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_KEY,
+    )
+
+
+def _gemini_call(prompt: str, temperature: float = 0.7) -> str:
+    """Call Gemini API."""
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=temperature),
+    )
+    return response.text.strip()
+
+
+def _openrouter_call(prompt: str, temperature: float = 0.7) -> str:
+    """Call OpenRouter free model."""
+    if not or_client:
+        raise Exception("No OpenRouter API key")
+    for model in OPENROUTER_MODELS:
+        try:
+            response = or_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            if "429" in str(e):
+                log.warning(f"⏳ {model} rate limited, trying next...")
+                continue
+            raise
+    raise Exception("All OpenRouter models exhausted")
+
+
+def _api_call(prompt: str, temperature: float = 0.7) -> str:
+    """Make an API call: try Gemini first, fall back to OpenRouter."""
+    # Try Gemini first
+    try:
+        return _gemini_call(prompt, temperature)
+    except Exception as e:
+        if "429" in str(e):
+            log.warning(f"⏳ Gemini rate limited, switching to OpenRouter...")
+            set_status("idle", "Switching to OpenRouter...")
+        else:
+            raise
+
+    # Fall back to OpenRouter
+    try:
+        return _openrouter_call(prompt, temperature)
+    except Exception as e:
+        if "429" in str(e):
+            # Both exhausted, wait and retry Gemini
+            log.warning(f"⏳ All models rate limited, waiting 30s...")
+            set_status("idle", "All models busy, waiting 30s")
+            time.sleep(30)
+            return _gemini_call(prompt, temperature)
+        raise
+
 
 def check_gemini_api() -> bool:
     try:
-        client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents="Say hi in 3 words",
-            config=types.GenerateContentConfig(max_output_tokens=10),
-        )
+        _api_call("Say hi in 3 words", temperature=0.1)
         return True
     except Exception:
         return False
@@ -229,14 +305,7 @@ def get_project_idea() -> dict:
 
     for attempt in range(3):
         try:
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=1.0,
-                )
-            )
-            text = response.text.strip()
+            text = _api_call(prompt, temperature=1.0)
             return _extract_json(text)
         except (json.JSONDecodeError, Exception) as e:
             log.warning(f"Attempt {attempt + 1} failed: {e}")
@@ -316,14 +385,7 @@ def generate_plan(project: dict) -> dict:
 
     for attempt in range(3):
         try:
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.7,
-                )
-            )
-            text = response.text.strip()
+            text = _api_call(prompt, temperature=0.7)
             return _extract_json(text)
         except (json.JSONDecodeError, Exception) as e:
             log.warning(f"Plan attempt {attempt + 1} failed: {e}")
@@ -349,15 +411,7 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
         file_description=file_info["description"],
     )
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.7,
-        )
-    )
-
-    text = response.text.strip()
+    text = _api_call(prompt, temperature=0.7)
     # Clean up markdown fences
     if "```" in text:
         text = text.split("```")
@@ -712,43 +766,48 @@ def build_project():
     log.info("🔧 Bob is thinking of something to build...")
     set_status("thinking", "Coming up with an idea...")
 
-    # Health checks - just try the Gemini API directly
     try:
-        if not check_gemini_api():
+        # Health checks
+        try:
+            if not check_gemini_api():
+                set_status("offline", "Gemini API not responding")
+                return None
+        except Exception:
             set_status("offline", "Gemini API not responding")
             return None
-    except Exception:
-        set_status("offline", "Gemini API not responding")
-        return None
 
-    # 1. Get idea
-    idea = get_project_idea()
-    log.info(f"💡 Idea: {idea['title']} — {idea['description']} ({idea.get('framework', 'html')})")
-    set_status("building", idea["title"])
+        # 1. Get idea
+        idea = get_project_idea()
+        log.info(f"💡 Idea: {idea['title']} — {idea['description']} ({idea.get('framework', 'html')})")
+        set_status("building", idea["title"])
 
-    # 2. Generate plan
-    log.info(f"📋 Creating plan for {idea['title']} ({idea.get('framework', 'html')})...")
-    plan = generate_plan(idea)
-    plan["title"] = idea["title"]
-    plan["description"] = idea["description"]
-    plan["features"] = idea["features"]
-    file_count = len(plan.get("files", []))
-    log.info(f"📋 Plan: {file_count} files to generate")
+        # 2. Generate plan
+        log.info(f"📋 Creating plan for {idea['title']} ({idea.get('framework', 'html')})...")
+        plan = generate_plan(idea)
+        plan["title"] = idea["title"]
+        plan["description"] = idea["description"]
+        plan["features"] = idea["features"]
+        file_count = len(plan.get("files", []))
+        log.info(f"📋 Plan: {file_count} files to generate")
 
-    # 3. Build file by file
-    log.info(f"🔨 Building {idea['title']}...")
-    save_project_files(idea["name"], plan)
+        # 3. Build file by file
+        log.info(f"🔨 Building {idea['title']}...")
+        save_project_files(idea["name"], plan)
 
-    # 4. Commit and push
-    set_status("pushing", idea["name"])
-    push_changes(f"Build: {idea['title']}")
+        # 4. Commit and push
+        set_status("pushing", idea["name"])
+        push_changes(f"Build: {idea['title']}")
 
-    # 5. Remember
-    save_project(idea)
-    set_status("idle", f"Built: {idea['title']}")
-    log.info("✅ Bob finished! Ready for next build.")
+        # 5. Remember
+        save_project(idea)
+        set_status("idle", f"Built: {idea['title']}")
+        log.info("✅ Bob finished! Ready for next build.")
+        return idea
 
-    return idea
+    except Exception as e:
+        set_status("error", str(e)[:100])
+        log.error(f"❌ Build failed: {e}")
+        raise
 
 
 def main():
@@ -808,5 +867,23 @@ def main():
             log.info("💤 Bob will try again later...")
 
 
+def _crash_handler(signum=None, frame=None):
+    """Write error status on any crash."""
+    set_status("error", "Process killed")
+    import sys
+    sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    import signal
+    signal.signal(signal.SIGTERM, _crash_handler)
+    signal.signal(signal.SIGINT, lambda s, f: (_crash_handler(), None)[1])
+    try:
+        main()
+    except Exception as e:
+        try:
+            set_status("error", str(e)[:100])
+        except Exception:
+            pass
+        log.error(f"💀 Bob crashed: {e}")
+        raise
