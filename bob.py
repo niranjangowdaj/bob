@@ -256,7 +256,6 @@ Features: {features}
 Return a JSON object with the project plan:
 {{
   "framework": "{framework}",
-  "setup_command": "command to create project (e.g. 'npx create-next-app@latest project --typescript --tailwind --app') or empty for plain-html",
   "install_command": "npm install or empty",
   "build_command": "npm run build or empty",
   "files": [
@@ -265,15 +264,17 @@ Return a JSON object with the project plan:
   ]
 }}
 
-Rules:
-- List ALL files needed for the project
+IMPORTANT RULES:
+- Do NOT include setup_command (like npx create-vite or create-next-app). Bob generates all files directly.
+- List ALL files needed for the project (package.json, config files, source files, etc.)
 - For plain-html: just one index.html
-- For React: src/App.tsx, src/main.tsx, index.html, package.json, vite.config.ts, etc.
-- For Next.js: app/layout.tsx, app/page.tsx, next.config.js, package.json, etc.
-- For Next.js: MUST include output: 'export' in next.config.js
+- For React (Vite + TypeScript): package.json, vite.config.ts, index.html, tsconfig.json, src/main.tsx, src/App.tsx, src/App.css, etc.
+- For Next.js: package.json, next.config.js, tsconfig.json, app/layout.tsx, app/page.tsx, app/globals.css, etc.
+- For Next.js: MUST include output: 'export' in next.config.js for static export
 - Keep file count reasonable (5-15 files max)
 - Use TypeScript when possible
 - Make sure the project can be statically exported (no server-side features)
+- All dependencies must be listed in package.json
 """
 
 FILE_PROMPT = """You are Bob, an autonomous website builder bot.
@@ -490,20 +491,7 @@ def save_project_files(project_name: str, plan: dict):
         full_path.write_text(content, encoding="utf-8")
         log.info(f"📁 Saved {file_info['path']}")
     else:
-        # Framework: run setup first
-        setup = plan.get("setup_command", "")
-        if setup:
-            log.info(f"📦 Running setup: {setup}")
-            subprocess.run(
-                setup,
-                shell=True,
-                cwd=str(project_dir),
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-
-        # Generate each file individually
+        # Framework: generate each file directly (no interactive setup)
         for i, file_info in enumerate(plan["files"]):
             log.info(f"  📄 [{i+1}/{len(plan['files'])}] {file_info['path']}")
             content = generate_file(file_info, plan, project_dir)
@@ -511,17 +499,20 @@ def save_project_files(project_name: str, plan: dict):
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content, encoding="utf-8")
 
-        # Install dependencies
+        # Install dependencies (non-interactive)
         install_cmd = plan.get("install_command", "")
         if install_cmd:
             log.info(f"📥 Installing: {install_cmd}")
+            env = os.environ.copy()
+            env["CI"] = "true"  # prevents interactive prompts
             subprocess.run(
                 install_cmd,
                 shell=True,
                 cwd=str(project_dir),
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=300,
+                env=env,
             )
 
         # Build if needed
@@ -534,7 +525,7 @@ def save_project_files(project_name: str, plan: dict):
                 cwd=str(project_dir),
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=300,
             )
 
         # Generate GitHub Actions workflow
