@@ -563,66 +563,6 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
     return text.strip()
 
 
-def get_build_output_dir(framework: str) -> str:
-    """Get the build output directory for a framework."""
-    return {
-        "react": "dist",
-        "vite": "dist",
-        "nextjs": "out",
-        "astro": "dist",
-        "svelte": "build",
-        "vue": "dist",
-    }.get(framework, "dist")
-
-
-def generate_github_actions_workflow(project_name: str, framework: str) -> str:
-    """Generate a GitHub Actions workflow that deploys pre-built output.
-    Bob builds locally, so the workflow just uploads the built files."""
-    output_dir = get_build_output_dir(framework)
-
-    workflow = f"""name: Deploy {project_name}
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'projects/{project_name}/{output_dir}/**'
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages-{project_name}"
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{{{ steps.deployment.outputs.page_url }}}}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: projects/{project_name}/{output_dir}
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-"""
-    return workflow
-
-
 def _run_command(cmd: str, cwd: Path, env: dict = None) -> tuple[bool, str]:
     """Run a command and return (success, error_output)."""
     try:
@@ -739,14 +679,6 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
                 return
             else:
                 raise Exception(f"Build failed after 5 attempts: {error[:200]}")
-
-    # Generate GitHub Actions workflow
-    workflows_dir = BOB_DIR / ".github" / "workflows"
-    workflows_dir.mkdir(parents=True, exist_ok=True)
-    workflow_file = workflows_dir / f"deploy-{project_name}.yml"
-    workflow_content = generate_github_actions_workflow(project_name, framework)
-    workflow_file.write_text(workflow_content, encoding="utf-8")
-    log.info(f"⚙️ Created workflow: {workflow_file}")
 
     update_project_status(project_name, "complete", total_files, total_files)
 
