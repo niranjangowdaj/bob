@@ -217,11 +217,20 @@ def get_project_idea() -> dict:
     )
 
     text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-        text = text.rsplit("```", 1)[0]
-
-    return json.loads(text.strip())
+    # Robust JSON extraction
+    if "```" in text:
+        text = text.split("```")
+        for part in text:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                return json.loads(part)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        return json.loads(text[start:end+1])
+    return json.loads(text)
 
 
 # ─── Website Generation ──────────────────────────────────────────────────
@@ -303,11 +312,20 @@ def generate_plan(project: dict) -> dict:
     )
 
     text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-        text = text.rsplit("```", 1)[0]
-
-    return json.loads(text.strip())
+    # Robust JSON extraction
+    if "```" in text:
+        text = text.split("```")
+        for part in text:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                return json.loads(part)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        return json.loads(text[start:end+1])
+    return json.loads(text)
 
 
 def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
@@ -338,10 +356,15 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
     )
 
     text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-        text = text.rsplit("```", 1)[0]
-
+    # Clean up markdown fences
+    if "```" in text:
+        text = text.split("```")
+        for part in text:
+            part = part.strip()
+            if part.startswith("html") or part.startswith("css") or part.startswith("javascript") or part.startswith("typescript") or part.startswith("json"):
+                part = part.split("\n", 1)[1] if "\n" in part else part
+            if part and not part.startswith("{") and len(part) > 50:
+                return part.strip()
     return text.strip()
 
 
