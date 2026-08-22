@@ -4,26 +4,117 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bob's Projects</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      text-align: center;
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --card-hover: #1a1a1a;
+      --border: #222;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --accent: #4ade80;
     }
-    h1 { font-size: 2rem; }
-    p { color: #888; margin-top: 0.5rem; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .header h1 span { color: var(--accent); }
+    .header p { color: var(--text-dim); font-size: 1.1rem; }
+    .count {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .card:hover {
+      background: var(--card-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .card h2 { font-size: 1.1rem; font-weight: 600; }
+    .badge {
+      background: var(--accent);
+      color: #000;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .card p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.4; flex: 1; }
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+    .date { color: var(--text-dim); }
+    .link { color: var(--accent); font-weight: 600; }
+    .empty {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 1.2rem;
+      margin-top: 4rem;
+    }
   </style>
 </head>
 <body>
-  <div>
-    <h1>🤖 Bob's Projects</h1>
-    <p>Coming soon... Bob is setting up.</p>
+  <div class="header">
+    <h1>🤖 Bob's <span>Projects</span></h1>
+    <p>Autonomously built by Bob · <span class="count">1</span> projects</p>
+  </div>
+  <div class="grid">
+    
+        <a href="https://niranjangowdaj.github.io/bob/projects/echo-chamber-visualizer/" target="_blank" class="card">
+          <div class="card-header">
+            <h2>Echo Chamber Visualizer</h2>
+            <span class="badge">nextjs</span>
+          </div>
+          <p>An interactive 3D map that visualizes the clustering of sentiments across social media hashtags using real-time API sentiment analysis.</p>
+          <div class="card-footer">
+            <span class="date">2026-08-23</span>
+            <span class="link">Visit →</span>
+          </div>
+        </a>
+
   </div>
 </body>
 </html>

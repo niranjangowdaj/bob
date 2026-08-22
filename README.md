@@ -5,11 +5,13 @@ Bob lives on your machine in a single folder. He builds websites using **any fra
 ## What Bob Does
 
 1. **Starts up** → checks for uncommitted changes → pushes them
-2. **Thinks** of a unique web project idea using Gemini AI
-3. **Builds** it with the best framework for the job
-4. **Saves** it to `projects/` inside his folder
-5. **Pushes** everything to GitHub
-6. **Rests** for 1 hour, then repeats
+2. **Resumes** any incomplete project from last time
+3. **Thinks** of a new idea (if no incomplete project)
+4. **Plans** the project structure (which files to create)
+5. **Builds** file by file, tracking progress
+6. **Saves** to `projects/` inside his folder
+7. **Pushes** everything to GitHub
+8. **Waits** for next build cycle
 
 ## Setup (5 minutes)
 

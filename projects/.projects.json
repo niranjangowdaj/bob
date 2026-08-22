@@ -1,0 +1,14 @@
+[
+  {
+    "name": "echo-chamber-visualizer",
+    "title": "Echo Chamber Visualizer",
+    "description": "An interactive 3D map that visualizes the clustering of sentiments across social media hashtags using real-time API sentiment analysis.",
+    "framework": "nextjs",
+    "features": [
+      "Three.js integration for 3D force-directed graphs",
+      "Sentiment analysis via Vercel AI SDK",
+      "Real-time data streaming dashboard"
+    ],
+    "built_at": "2026-08-23T00:30:05.731500"
+  }
+]

@@ -185,6 +185,54 @@ def check_gemini_api() -> bool:
         return False
 
 
+# ─── Problem Tracking ───────────────────────────────────────────────────
+
+def get_problems() -> str:
+    """Read known problems from PROBLEMS.md."""
+    problems_file = BOB_DIR / "PROBLEMS.md"
+    if problems_file.exists():
+        content = problems_file.read_text()
+        # Extract lines under ## Problems
+        lines = []
+        in_problems = False
+        for line in content.split("\n"):
+            if line.strip() == "## Problems":
+                in_problems = True
+                continue
+            if in_problems and line.startswith("## "):
+                break
+            if in_problems and line.strip().startswith("-"):
+                lines.append(line.strip())
+        return "\n".join(lines) if lines else "(none)"
+    return "(none)"
+
+
+def move_to_solved(problem: str):
+    """Move a problem from PROBLEMS.md to SOLVED.md."""
+    problems_file = BOB_DIR / "PROBLEMS.md"
+    solved_file = BOB_DIR / "SOLVED.md"
+
+    # Remove from PROBLEMS.md
+    if problems_file.exists():
+        content = problems_file.read_text()
+        content = content.replace(problem, "")
+        # Clean up empty lines
+        lines = [l for l in content.split("\n") if l.strip()]
+        problems_file.write_text("\n".join(lines) + "\n")
+
+    # Add to SOLVED.md
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    solved_entry = f"- [{timestamp}] {problem}"
+    if solved_file.exists():
+        content = solved_file.read_text()
+        content = content.replace("(none yet)", solved_entry)
+        solved_file.write_text(content)
+    else:
+        solved_file.write_text(f"# Solved Problems\n\n{solved_entry}\n")
+
+    log.info(f"✅ Problem marked as solved: {problem[:50]}...")
+
+
 # ─── Git Operations (single repo) ───────────────────────────────────────
 
 def run_git(*args) -> subprocess.CompletedProcess:
@@ -292,15 +340,18 @@ Rules:
 - Make it something actually cool and useful
 - Never repeat previous ideas: {previous_projects}
 - The project must be hostable (static export, Vercel-compatible, or plain HTML)
+- AVOID these known problems: {problems}
 """
 
 
 def get_project_idea() -> dict:
     previous = get_previous_projects()
     previous_names = [p.get("name", "unknown") for p in previous[-20:]]
+    problems = get_problems()
 
     prompt = IDEA_PROMPT.format(
-        previous_projects=", ".join(previous_names) if previous_names else "none yet"
+        previous_projects=", ".join(previous_names) if previous_names else "none yet",
+        problems=problems,
     )
 
     for attempt in range(3):
@@ -344,6 +395,7 @@ IMPORTANT RULES:
 - Use TypeScript when possible
 - Make sure the project can be statically exported (no server-side features)
 - All dependencies must be listed in package.json
+- AVOID these known problems: {problems}
 """
 
 FILE_PROMPT = """You are Bob, an autonomous website builder bot.
@@ -371,16 +423,19 @@ Requirements:
 - This should look like a real production website
 - For TypeScript files: proper types, no `any`
 - Import paths must match the project structure
+- AVOID these known problems: {problems}
 """
 
 
 def generate_plan(project: dict) -> dict:
     """Generate a build plan for the project."""
+    problems = get_problems()
     prompt = PLAN_PROMPT.format(
         title=project["title"],
         description=project["description"],
         framework=project.get("framework", "plain-html"),
         features=", ".join(project["features"]),
+        problems=problems,
     )
 
     for attempt in range(3):
@@ -401,6 +456,7 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
         if f["path"] != file_info["path"]:
             other_files.append(f"{f['path']} - {f['description']}")
 
+    problems = get_problems()
     prompt = FILE_PROMPT.format(
         file_path=file_info["path"],
         title=project["title"],
@@ -409,6 +465,7 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
         features=", ".join(project["features"]),
         file_list="\n".join(other_files) if other_files else "(first file)",
         file_description=file_info["description"],
+        problems=problems,
     )
 
     text = _api_call(prompt, temperature=0.7)
@@ -535,6 +592,7 @@ def save_project_files(project_name: str, plan: dict):
     project_dir.mkdir(exist_ok=True)
 
     framework = plan.get("framework", "plain-html")
+    total_files = len(plan.get("files", []))
 
     # For plain HTML: generate single file
     if framework == "plain-html":
@@ -544,14 +602,17 @@ def save_project_files(project_name: str, plan: dict):
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(content, encoding="utf-8")
         log.info(f"📁 Saved {file_info['path']}")
+        update_project_status(project_name, "complete", 1, 1)
     else:
         # Framework: generate each file directly (no interactive setup)
         for i, file_info in enumerate(plan["files"]):
-            log.info(f"  📄 [{i+1}/{len(plan['files'])}] {file_info['path']}")
+            log.info(f"  📄 [{i+1}/{total_files}] {file_info['path']}")
             content = generate_file(file_info, plan, project_dir)
             full_path = project_dir / file_info["path"]
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content, encoding="utf-8")
+            # Update progress after each file
+            update_project_status(project_name, "in_progress", i + 1, total_files)
 
         # Install dependencies (non-interactive)
         install_cmd = plan.get("install_command", "")
@@ -590,6 +651,9 @@ def save_project_files(project_name: str, plan: dict):
         workflow_file.write_text(workflow_content, encoding="utf-8")
         log.info(f"⚙️ Created workflow: {workflow_file}")
 
+        # Mark complete
+        update_project_status(project_name, "complete", total_files, total_files)
+
 
 # ─── Project Memory ──────────────────────────────────────────────────────
 
@@ -601,15 +665,40 @@ def get_previous_projects() -> list:
     return []
 
 
-def save_project(project: dict):
+def get_incomplete_project() -> dict | None:
+    """Find a project that was started but not finished."""
+    projects = get_previous_projects()
+    for p in reversed(projects):
+        if p.get("status") == "in_progress":
+            return p
+    return None
+
+
+def save_project(project: dict, status: str = "complete"):
     projects_file = PROJECTS_DIR / ".projects.json"
     projects = get_previous_projects()
     project["built_at"] = datetime.now().isoformat()
+    project["status"] = status
     projects.append(project)
     with open(projects_file, "w") as f:
         json.dump(projects, f, indent=2)
     # Regenerate index page
     generate_index_page()
+
+
+def update_project_status(project_name: str, status: str, files_done: int = 0, files_total: int = 0):
+    """Update a project's progress."""
+    projects_file = PROJECTS_DIR / ".projects.json"
+    projects = get_previous_projects()
+    for p in projects:
+        if p.get("name") == project_name:
+            p["status"] = status
+            p["files_done"] = files_done
+            p["files_total"] = files_total
+            p["updated_at"] = datetime.now().isoformat()
+            break
+    with open(projects_file, "w") as f:
+        json.dump(projects, f, indent=2)
 
 
 def generate_index_page():
@@ -625,18 +714,29 @@ def generate_index_page():
         desc = p.get("description", "")
         framework = p.get("framework", "html")
         built = p.get("built_at", "")[:10]  # just the date
+        status = p.get("status", "complete")
+        files_done = p.get("files_done", 0)
+        files_total = p.get("files_total", 0)
         url = f"https://{username}.github.io/{repo}/projects/{name}/"
+
+        # Status badge
+        if status == "in_progress":
+            status_badge = f'<span class="badge building">Building {files_done}/{files_total}</span>'
+            link_text = "In progress..."
+        else:
+            status_badge = f'<span class="badge">{framework}</span>'
+            link_text = "Visit →"
 
         cards += f"""
         <a href="{url}" target="_blank" class="card">
           <div class="card-header">
             <h2>{title}</h2>
-            <span class="badge">{framework}</span>
+            {status_badge}
           </div>
           <p>{desc}</p>
           <div class="card-footer">
             <span class="date">{built}</span>
-            <span class="link">Visit →</span>
+            <span class="link">{link_text}</span>
           </div>
         </a>
 """
@@ -725,6 +825,14 @@ def generate_index_page():
       border-radius: 4px;
       white-space: nowrap;
     }}
+    .badge.building {{
+      background: #f59e0b;
+      animation: pulse 2s infinite;
+    }}
+    @keyframes pulse {{
+      0%, 100% {{ opacity: 1; }}
+      50% {{ opacity: 0.6; }}
+    }}
     .card p {{ color: var(--text-dim); font-size: 0.9rem; line-height: 1.4; flex: 1; }}
     .card-footer {{
       display: flex;
@@ -763,9 +871,6 @@ def generate_index_page():
 
 def build_project():
     """Bob builds one project from start to finish."""
-    log.info("🔧 Bob is thinking of something to build...")
-    set_status("thinking", "Coming up with an idea...")
-
     try:
         # Health checks
         try:
@@ -776,10 +881,21 @@ def build_project():
             set_status("offline", "Gemini API not responding")
             return None
 
-        # 1. Get idea
-        idea = get_project_idea()
-        log.info(f"💡 Idea: {idea['title']} — {idea['description']} ({idea.get('framework', 'html')})")
-        set_status("building", idea["title"])
+        # Check for incomplete project first
+        incomplete = get_incomplete_project()
+        if incomplete:
+            log.info(f"🔄 Resuming incomplete project: {incomplete['title']}")
+            set_status("building", f"Resuming: {incomplete['title']}")
+            idea = incomplete
+        else:
+            # 1. Get new idea
+            log.info("🔧 Bob is thinking of something to build...")
+            set_status("thinking", "Coming up with an idea...")
+            idea = get_project_idea()
+            log.info(f"💡 Idea: {idea['title']} — {idea['description']} ({idea.get('framework', 'html')})")
+            set_status("building", idea["title"])
+            # Save as in_progress
+            save_project(idea, status="in_progress")
 
         # 2. Generate plan
         log.info(f"📋 Creating plan for {idea['title']} ({idea.get('framework', 'html')})...")
@@ -798,8 +914,8 @@ def build_project():
         set_status("pushing", idea["name"])
         push_changes(f"Build: {idea['title']}")
 
-        # 5. Remember
-        save_project(idea)
+        # 5. Mark complete
+        update_project_status(idea["name"], "complete")
         set_status("idle", f"Built: {idea['title']}")
         log.info("✅ Bob finished! Ready for next build.")
         return idea
