@@ -10,8 +10,11 @@
       "Real-time data streaming dashboard"
     ],
     "built_at": "2026-08-23T00:30:05.731500",
-    "status": "error",
-    "error": "Next.js build failed - missing 'use client' directive and other issues. Needs rework."
+    "status": "in_progress",
+    "error": "Next.js build failed - missing 'use client' directive and other issues. Needs rework.",
+    "files_done": 4,
+    "files_total": 4,
+    "updated_at": "2026-08-23T01:01:20.188647"
   },
   {
     "name": "orbit-focus",
@@ -24,8 +27,11 @@
       "Local-first data persistence using IndexedDB"
     ],
     "built_at": "2026-08-23T00:39:06.062571",
-    "status": "error",
-    "error": "Next.js build failed - missing 'use client' directive in components using hooks. Needs rework."
+    "status": "reworked",
+    "error": "Next.js build failed - missing 'use client' directive in components using hooks. Needs rework.",
+    "files_done": 0,
+    "files_total": 0,
+    "updated_at": "2026-08-23T01:02:38.545118"
   },
   {
     "name": "chroma-chord",

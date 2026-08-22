@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Space+Grotesk:wght@300;500;700&display=swap');
+
+:root {
+  --bg-dark: #05070a;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+h1, h2 {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Orbital Animations */
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(150px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(150px) rotate(-360deg); }
+}
+
+.orbital-body {
+  animation: orbit 20s linear infinite;
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle, var(--accent-blue), var(--accent-purple));
+  border-radius: 50%;
+  box-shadow: 0 0 15px var(--accent-blue);
+}
+
+.gravity-well {
+  width: 300px;
+  height: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Interactive Element Styles */
+.btn-focus {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid var(--accent-blue);
+  color: var(--text-main);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+.btn-focus:hover {
+  background: var(--accent-blue);
+  box-shadow: 0 0 20px var(--accent-blue);
+}
+
+@media (max-width: 768px) {
+  .gravity-well {
+    width: 200px;
+    height: 200px;
+  }
+  .orbital-body {
+    animation: orbit 15s linear infinite;
+  }
+}
