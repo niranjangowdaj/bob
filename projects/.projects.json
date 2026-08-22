@@ -44,5 +44,18 @@
     ],
     "built_at": "2026-08-23T01:51:02.296759",
     "status": "complete"
+  },
+  {
+    "name": "habit-heist-rpg",
+    "title": "Habit Heist RPG",
+    "description": "A gamified task tracker where completing daily habits earns experience points to upgrade a digital character and unlock randomized loot drops.",
+    "framework": "react",
+    "features": [
+      "Character stats leveling system based on task completion",
+      "Persistent local storage for streak tracking",
+      "Procedural loot generator for rewarding consistent streaks"
+    ],
+    "built_at": "2026-08-23T01:52:36.551185",
+    "status": "in_progress"
   }
 ]

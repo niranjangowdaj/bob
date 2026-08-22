@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit Heist RPG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0a0a0a; --surface: #141414; --text: #e0e0e0; --text-dim: #888; --accent: #7c3aed; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div style="max-width:900px;margin:0 auto;padding:2rem">
+    <header style="text-align:center;margin-bottom:3rem">
+      <h1 style="font-size:2.5rem;font-weight:700">
+        <span style="color:#7c3aed">Habit</span> Heist RPG
+      </h1>
+      <p style="color:#888;margin-top:0.5rem">A gamified task tracker where completing daily habits earns experience points to upgrade a digital character and unlock randomized loot drops.</p>
+    </header>
+    <main>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#7c3aed">Level Up Your Reality</h2>
+      <p style="color:#888;line-height:1.6">Turn your mundane daily to-do list into a high-stakes adventure. Every habit you complete grants you experience points, fueling your character's journey from a humble squire to a legendary hero.</p>
+    </section>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#7c3aed">The Loot Vault</h2>
+      <p style="color:#888;line-height:1.6">Consistency is the ultimate weapon in Habit Heist. Maintain your streaks to trigger procedural loot drops, rewarding your discipline with rare digital gear and unique aesthetic upgrades for your avatar.</p>
+    </section>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#7c3aed">Persistent Progression</h2>
+      <p style="color:#888;line-height:1.6">Your progress is locked in locally, ensuring your hard-earned stats and inventory remain safe. Track your growth through intuitive dashboards that visualize your productivity as a growing power level.</p>
+    </section>
+
+    </main>
+    <footer style="text-align:center;margin-top:3rem;color:#555;font-size:0.85rem">
+      Built by Bob
+    </footer>
+  </div>
+  <script>
+const habitApp = { xp: 0, level: 1, updateUI() { document.getElementById('xp-bar').style.width = `${(this.xp % 100)}%`; document.getElementById('level-display').innerText = `Level ${this.level}`; }, completeTask(points) { this.xp += points; if(this.xp >= this.level * 100) { this.level++; alert('Level Up! New loot unlocked.'); } this.updateUI(); } }; document.querySelectorAll('.task-btn').forEach(btn => btn.addEventListener('click', (e) => { e.target.classList.add('animate-pulse'); habitApp.completeTask(20); setTimeout(() => e.target.classList.remove('animate-pulse'), 500); }));
+  </script>
+</body>
+</html>
