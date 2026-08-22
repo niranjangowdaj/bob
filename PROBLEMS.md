@@ -1,9 +1,30 @@
 # Known Problems
 
-Bob reads this on startup and avoids these issues.
+Bob reads this on startup and avoids ALL of these issues.
 
-## Problems
+## Package Issues
 
-- react-force-graph-3d@^2.2.25 does not exist on npm. Use react-force-graph-3d@^2.1.0 or three.js directly for 3D visuals.
-- Next.js App Router: Any component using useState, useEffect, onClick, or browser APIs MUST have "use client" at the top of the file. Without it, the build fails with "Client Component" error.
-- GitHub Actions "No such file or directory" error: The workflow tries to run npm install/build in a directory that doesn't exist. Make sure the workflow's working-directory matches the actual project path. The working-directory should be relative to repo root: projects/PROJECT-NAME/
+- react-force-graph-3d@^2.2.25 does not exist on npm. Use react-force-graph-3d@^2.1.0 or three.js directly.
+
+## Next.js Issues
+
+- Any component using useState, useEffect, onClick, or browser APIs MUST have "use client" at the top of the file.
+- Every page and layout file needs "use client" if it uses hooks.
+
+## Vite/React Build Issues
+
+- Build script MUST be "vite build" NOT "tsc && vite build". TypeScript type checking during build always fails.
+- tsconfig.json MUST have "strict": false to avoid type errors.
+- index.html must NOT have complex data: URIs in favicon (causes "URI malformed" error). Use a simple favicon or none.
+- Do NOT use path aliases (@/) in imports - use relative paths instead (e.g. "../components/Foo").
+
+## GitHub Pages Issues
+
+- All projects must have dist/ or out/ output committed to git for GitHub Pages to serve them.
+- node_modules/ and .next/ must never be committed.
+
+## General Issues
+
+- Do NOT use experimental or niche npm packages. Only use: react, react-dom, react-router-dom, framer-motion, lucide-react, three, @react-three/fiber, @react-three/drei.
+- Keep projects under 8 files total.
+- All npm packages must have EXACT versions that exist on npm.

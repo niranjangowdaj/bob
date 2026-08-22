@@ -405,11 +405,12 @@ IMPORTANT RULES:
 - Each component should be self-contained and focused on ONE thing
 - Do NOT include setup_command. Bob generates all files directly.
 - For plain-html: just one index.html in files array
-- For React (Vite + TypeScript): config_files + components + entry files
-- For Next.js: MUST include output: 'export' in next.config.js
-- For Next.js: EVERY component using useState/useEffect/onClick MUST have "use client" as FIRST line
+- For React (Vite): config_files + components + entry files. Build script MUST be "vite build" NOT "tsc && vite build". tsconfig.json MUST have "strict": false.
+- For Next.js: MUST include output: 'export' in next.config.js. EVERY component using useState/useEffect/onClick MUST have "use client" as FIRST line.
 - All dependencies must be listed in package.json with EXACT versions that exist on npm
-- Use well-known, stable packages only (react, react-dom, three, framer-motion, etc.)
+- Use ONLY: react, react-dom, framer-motion, lucide-react (no experimental libs)
+- NO path aliases (@/) - use relative imports only
+- Simple favicon or none (no complex data: URIs)
 - AVOID these known problems: {problems}
 """
 
