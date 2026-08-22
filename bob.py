@@ -367,34 +367,49 @@ def get_project_idea() -> dict:
 # ─── Website Generation ──────────────────────────────────────────────────
 
 PLAN_PROMPT = """You are Bob, an autonomous website builder bot.
-Create a build plan for this project: {title}
+Create a DETAILED build plan for this project: {title}
 
 Description: {description}
 Framework: {framework}
 Features: {features}
 
-Return a JSON object with the project plan:
+Return a JSON object with NESTED planning:
 {{
   "framework": "{framework}",
-  "install_command": "npm install or empty",
-  "build_command": "npm run build or empty",
+  "install_command": "npm install",
+  "build_command": "npm run build",
+  "architecture": "Brief description of how the app is structured",
+  "components": [
+    {{
+      "name": "component-name",
+      "description": "what this component does",
+      "files": [
+        {{"path": "src/components/Name.tsx", "description": "what this file does"}},
+        {{"path": "src/components/Name.css", "description": "styles for this component"}}
+      ]
+    }}
+  ],
+  "config_files": [
+    {{"path": "package.json", "description": "dependencies and scripts"}},
+    {{"path": "vite.config.ts", "description": "build configuration"}}
+  ],
   "files": [
-    {{"path": "path/to/file", "description": "what this file does"}},
-    {{"path": "path/to/another", "description": "what this file does"}}
+    {{"path": "src/main.tsx", "description": "app entry point"}},
+    {{"path": "src/App.tsx", "description": "root component"}},
+    {{"path": "index.html", "description": "HTML shell"}}
   ]
 }}
 
 IMPORTANT RULES:
-- Do NOT include setup_command (like npx create-vite or create-next-app). Bob generates all files directly.
-- List ALL files needed for the project (package.json, config files, source files, etc.)
-- For plain-html: just one index.html
-- For React (Vite + TypeScript): package.json, vite.config.ts, index.html, tsconfig.json, src/main.tsx, src/App.tsx, src/App.css, etc.
-- For Next.js: package.json, next.config.js, tsconfig.json, app/layout.tsx, app/page.tsx, app/globals.css, etc.
-- For Next.js: MUST include output: 'export' in next.config.js for static export
-- Keep file count reasonable (5-15 files max)
-- Use TypeScript when possible
-- Make sure the project can be statically exported (no server-side features)
-- All dependencies must be listed in package.json
+- Break down into SMALL components (3-5 files each max)
+- Each component should be self-contained and focused on ONE thing
+- Do NOT include setup_command. Bob generates all files directly.
+- For plain-html: just one index.html in files array
+- For React (Vite + TypeScript): config_files + components + entry files
+- For Next.js: MUST include output: 'export' in next.config.js
+- For Next.js: EVERY component using useState/useEffect/onClick MUST have "use client" as FIRST line
+- All dependencies must be listed in package.json with EXACT versions that exist on npm
+- Use well-known, stable packages only (react, react-dom, three, framer-motion, etc.)
 - AVOID these known problems: {problems}
 """
 
@@ -423,6 +438,7 @@ Requirements:
 - This should look like a real production website
 - For TypeScript files: proper types, no `any`
 - Import paths must match the project structure
+- For Next.js App Router: if this file uses useState/useEffect/onClick/browser APIs, add "use client" as the FIRST line
 - AVOID these known problems: {problems}
 """
 
@@ -444,6 +460,48 @@ def generate_plan(project: dict) -> dict:
             return _extract_json(text)
         except (json.JSONDecodeError, Exception) as e:
             log.warning(f"Plan attempt {attempt + 1} failed: {e}")
+            if attempt == 2:
+                raise
+
+
+def replan_with_error(old_plan: dict, error: str, project_name: str) -> dict:
+    """Generate a new plan based on build error."""
+    prompt = f"""You are Bob, an autonomous website builder bot.
+The project "{old_plan.get('title', project_name)}" failed to build.
+
+Previous plan:
+{json.dumps(old_plan, indent=2)[:1000]}
+
+Build error:
+{error[:1500]}
+
+Create a NEW, simpler plan that avoids this error. Use different packages if needed.
+Return a JSON object with the new plan:
+{{
+  "framework": "{old_plan.get('framework', 'react')}",
+  "install_command": "npm install or empty",
+  "build_command": "npm run build or empty",
+  "files": [
+    {{"path": "path/to/file", "description": "what this file does"}}
+  ]
+}}
+
+IMPORTANT:
+- Fix the error described above
+- Use fewer, simpler dependencies
+- Keep it under 10 files
+- All dependencies must exist on npm and be compatible
+"""
+
+    problems = get_problems()
+    prompt = prompt.replace("{problems}", problems)
+
+    for attempt in range(3):
+        try:
+            text = _api_call(prompt, temperature=0.7)
+            return _extract_json(text)
+        except Exception as e:
+            log.warning(f"Replan attempt {attempt + 1} failed: {e}")
             if attempt == 2:
                 raise
 
@@ -586,73 +644,125 @@ jobs:
     return workflow
 
 
-def save_project_files(project_name: str, plan: dict):
-    """Save generated project to disk, file by file."""
+def _run_command(cmd: str, cwd: Path, env: dict = None) -> tuple[bool, str]:
+    """Run a command and return (success, error_output)."""
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=env,
+        )
+        if result.returncode != 0:
+            error = result.stderr or result.stdout
+            return False, error[:2000]  # truncate long errors
+        return True, ""
+    except subprocess.TimeoutExpired:
+        return False, "Command timed out after 300s"
+    except Exception as e:
+        return False, str(e)
+
+
+def flatten_plan(plan: dict) -> list[dict]:
+    """Flatten nested plan into ordered list of files."""
+    all_files = []
+    # Config files first
+    for f in plan.get("config_files", []):
+        all_files.append(f)
+    # Then component files (grouped by component)
+    for comp in plan.get("components", []):
+        log.info(f"  🧩 Component: {comp.get('name', '?')} — {comp.get('description', '')}")
+        for f in comp.get("files", []):
+            all_files.append(f)
+    # Then root files
+    for f in plan.get("files", []):
+        all_files.append(f)
+    # Deduplicate by path
+    seen = set()
+    unique = []
+    for f in all_files:
+        if f["path"] not in seen:
+            seen.add(f["path"])
+            unique.append(f)
+    return unique
+
+
+def save_project_files(project_name: str, plan: dict, attempt: int = 1):
+    """Save generated project to disk, file by file. Retries on build errors."""
     project_dir = PROJECTS_DIR / project_name
     project_dir.mkdir(exist_ok=True)
 
     framework = plan.get("framework", "plain-html")
-    total_files = len(plan.get("files", []))
+
+    # Flatten nested plan into file list
+    all_files = flatten_plan(plan)
+    total_files = len(all_files)
+    log.info(f"📋 Total files to generate: {total_files}")
 
     # For plain HTML: generate single file
     if framework == "plain-html":
-        file_info = plan["files"][0]  # just index.html
+        file_info = all_files[0]
         content = generate_file(file_info, plan, project_dir)
         full_path = project_dir / file_info["path"]
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(content, encoding="utf-8")
         log.info(f"📁 Saved {file_info['path']}")
         update_project_status(project_name, "complete", 1, 1)
-    else:
-        # Framework: generate each file directly (no interactive setup)
-        for i, file_info in enumerate(plan["files"]):
-            log.info(f"  📄 [{i+1}/{total_files}] {file_info['path']}")
-            content = generate_file(file_info, plan, project_dir)
-            full_path = project_dir / file_info["path"]
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text(content, encoding="utf-8")
-            # Update progress after each file
-            update_project_status(project_name, "in_progress", i + 1, total_files)
+        return
 
-        # Install dependencies (non-interactive)
-        install_cmd = plan.get("install_command", "")
-        if install_cmd:
-            log.info(f"📥 Installing: {install_cmd}")
-            env = os.environ.copy()
-            env["CI"] = "true"  # prevents interactive prompts
-            subprocess.run(
-                install_cmd,
-                shell=True,
-                cwd=str(project_dir),
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env=env,
-            )
+    # Framework: generate each file
+    for i, file_info in enumerate(all_files):
+        log.info(f"  📄 [{i+1}/{total_files}] {file_info['path']}")
+        content = generate_file(file_info, plan, project_dir)
+        full_path = project_dir / file_info["path"]
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content, encoding="utf-8")
+        update_project_status(project_name, "in_progress", i + 1, total_files)
 
-        # Build if needed
-        build_cmd = plan.get("build_command", "")
-        if build_cmd:
-            log.info(f"🔨 Building: {build_cmd}")
-            subprocess.run(
-                build_cmd,
-                shell=True,
-                cwd=str(project_dir),
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
+    # Install dependencies
+    install_cmd = plan.get("install_command", "")
+    if install_cmd:
+        log.info(f"📥 Installing: {install_cmd}")
+        env = os.environ.copy()
+        env["CI"] = "true"
+        success, error = _run_command(install_cmd, project_dir, env)
+        if not success:
+            log.error(f"❌ npm install failed:\n{error}")
+            if attempt < 3:
+                log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
+                new_plan = replan_with_error(plan, error, project_name)
+                save_project_files(project_name, new_plan, attempt + 1)
+                return
+            else:
+                raise Exception(f"Build failed after 3 attempts: {error[:200]}")
 
-        # Generate GitHub Actions workflow
-        workflows_dir = BOB_DIR / ".github" / "workflows"
-        workflows_dir.mkdir(parents=True, exist_ok=True)
-        workflow_file = workflows_dir / f"deploy-{project_name}.yml"
-        workflow_content = generate_github_actions_workflow(project_name, framework)
-        workflow_file.write_text(workflow_content, encoding="utf-8")
-        log.info(f"⚙️ Created workflow: {workflow_file}")
+    # Build
+    build_cmd = plan.get("build_command", "")
+    if build_cmd:
+        log.info(f"🔨 Building: {build_cmd}")
+        success, error = _run_command(build_cmd, project_dir)
+        if not success:
+            log.error(f"❌ npm build failed:\n{error}")
+            if attempt < 3:
+                log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
+                new_plan = replan_with_error(plan, error, project_name)
+                save_project_files(project_name, new_plan, attempt + 1)
+                return
+            else:
+                raise Exception(f"Build failed after 3 attempts: {error[:200]}")
 
-        # Mark complete
-        update_project_status(project_name, "complete", total_files, total_files)
+    # Generate GitHub Actions workflow
+    workflows_dir = BOB_DIR / ".github" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    workflow_file = workflows_dir / f"deploy-{project_name}.yml"
+    workflow_content = generate_github_actions_workflow(project_name, framework)
+    workflow_file.write_text(workflow_content, encoding="utf-8")
+    log.info(f"⚙️ Created workflow: {workflow_file}")
+
+    update_project_status(project_name, "complete", total_files, total_files)
 
 
 # ─── Project Memory ──────────────────────────────────────────────────────
@@ -921,8 +1031,20 @@ def build_project():
         return idea
 
     except Exception as e:
-        set_status("error", str(e)[:100])
+        error_msg = str(e)[:200]
+        set_status("error", error_msg)
         log.error(f"❌ Build failed: {e}")
+        # Save error to project for rework later
+        if 'idea' in dir() and idea:
+            update_project_status(idea["name"], "error")
+            projects_file = PROJECTS_DIR / ".projects.json"
+            projects = get_previous_projects()
+            for p in projects:
+                if p.get("name") == idea.get("name"):
+                    p["error"] = error_msg
+                    break
+            with open(projects_file, "w") as f:
+                json.dump(projects, f, indent=2)
         raise
 
 
@@ -990,10 +1112,91 @@ def _crash_handler(signum=None, frame=None):
     sys.exit(1)
 
 
+def get_failed_projects() -> list:
+    """Find projects that failed to build (have error in status)."""
+    projects = get_previous_projects()
+    return [p for p in projects if p.get("status") == "error"]
+
+
+def rework_project(project: dict):
+    """Re-plan and rebuild a failed project from scratch."""
+    name = project["name"]
+    log.info(f"🔄 Reworking failed project: {project['title']}")
+    set_status("building", f"Reworking: {project['title']}")
+
+    # Delete old files
+    project_dir = PROJECTS_DIR / name
+    if project_dir.exists():
+        import shutil
+        shutil.rmtree(project_dir)
+        log.info(f"🗑️ Deleted old files for {name}")
+
+    # Generate new plan with error context
+    old_error = project.get("error", "Unknown error")
+    prompt = f"""You are Bob. Rebuild this project with a SIMPLER approach.
+
+Project: {project['title']}
+Description: {project['description']}
+Framework: {project.get('framework', 'react')}
+Previous error: {old_error[:500]}
+
+Create a new, simpler plan. Use fewer dependencies. Under 8 files.
+Return JSON:
+{{"framework": "...", "install_command": "npm install", "build_command": "npm run build",
+ "architecture": "...",
+ "components": [{{"name": "...", "description": "...", "files": [{{"path": "...", "description": "..."}}]}}],
+ "config_files": [{{"path": "...", "description": "..."}}],
+ "files": [{{"path": "...", "description": "..."}}]}}
+
+Use ONLY stable, well-known packages. No experimental libs.
+"""
+    problems = get_problems()
+    prompt += f"\nAVOID: {problems}"
+
+    plan = None
+    for attempt in range(3):
+        try:
+            text = _api_call(prompt, temperature=0.7)
+            plan = _extract_json(text)
+            break
+        except Exception as e:
+            log.warning(f"Replan attempt {attempt + 1} failed: {e}")
+
+    if not plan:
+        raise Exception("Could not generate new plan")
+
+    plan["title"] = project["title"]
+    plan["description"] = project["description"]
+    plan["features"] = project.get("features", [])
+
+    # Build with new plan
+    save_project_files(name, plan)
+
+    # Update status
+    update_project_status(name, "reworked")
+    log.info(f"✅ Reworked {project['title']}")
+
+
 if __name__ == "__main__":
+    import sys
     import signal
     signal.signal(signal.SIGTERM, _crash_handler)
     signal.signal(signal.SIGINT, lambda s, f: (_crash_handler(), None)[1])
+
+    # Check for --rework flag
+    if "--rework" in sys.argv:
+        failed = get_failed_projects()
+        if not failed:
+            log.info("✅ No failed projects to rework")
+        else:
+            log.info(f"🔄 Found {len(failed)} failed project(s) to rework")
+            for p in failed:
+                try:
+                    rework_project(p)
+                except Exception as e:
+                    log.error(f"❌ Rework failed for {p['name']}: {e}")
+        sys.exit(0)
+
     try:
         main()
     except Exception as e:

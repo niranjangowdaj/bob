@@ -161,8 +161,33 @@ bob/
 
 Each project is self-contained in its own subdirectory under `projects/`.
 
+## Commands
+
+```bash
+python bob.py           # Normal mode: build new projects
+python bob.py --rework  # Rework all failed projects
+```
+
+## How Bob Builds (Nested Planning)
+
+Bob uses a 3-level planning system:
+
+1. **Architecture** — how the app is structured
+2. **Components** — small, focused pieces (3-5 files each)
+3. **Files** — individual files within each component
+
+This gives better quality code and easier debugging.
+
+## Self-Healing
+
+When a build fails:
+1. Bob captures the full error
+2. Creates a NEW simpler plan (fewer deps, different approach)
+3. Regenerates files and retries (up to 3 times)
+4. If still failing → saves error for later rework
+
 ## Customization
 
 - **Build frequency**: Edit `wait` in `bob.py` (default: 1 hour)
 - **Repo name**: Change `GITHUB_REPO` in `.env`
-- **Gemini model**: Change the model name in `bob.py`
+- **Problems**: Edit `PROBLEMS.md` to tell Bob about issues
