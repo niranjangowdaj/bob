@@ -8,9 +8,10 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "tone": "^14.7.77"
+  },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^3.1.1",
-    "svelte": "^4.2.18",
-    "vite": "^5.3.3"
+    "vite": "^5.0.0"
   }
 }
