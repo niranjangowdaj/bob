@@ -133,8 +133,8 @@ class BobWidget(rumps.App):
         }
         self.status_item.title = f"{icon} {state_labels.get(state, state)}"
 
-        # Update menu bar icon
-        self.icon = icon
+        # Update menu bar title (rumps can't use emoji as icon files)
+        self.title = icon
 
         # Project info
         if state == "building":

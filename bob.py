@@ -67,16 +67,20 @@ def set_status(state: str, message: str = ""):
 
 def check_internet() -> bool:
     try:
-        urllib.request.urlopen("https://www.google.com", timeout=5)
+        urllib.request.urlopen("https://dns.google/resolve?name=google.com", timeout=5)
         return True
     except Exception:
-        return False
+        try:
+            urllib.request.urlopen("https://httpbin.org/ip", timeout=5)
+            return True
+        except Exception:
+            return False
 
 
 def check_gemini_api() -> bool:
     try:
         client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.6-flash",
             contents="Say hi in 3 words",
             config=types.GenerateContentConfig(max_output_tokens=10),
         )
@@ -204,7 +208,7 @@ def get_project_idea() -> dict:
     )
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3.6-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=1.0,
@@ -222,32 +226,51 @@ def get_project_idea() -> dict:
 
 # ─── Website Generation ──────────────────────────────────────────────────
 
-CODE_PROMPT = """You are Bob, an autonomous website builder bot.
-Build this project: {title}
+PLAN_PROMPT = """You are Bob, an autonomous website builder bot.
+Create a build plan for this project: {title}
 
 Description: {description}
 Framework: {framework}
 Features: {features}
 
-Generate a COMPLETE, production-quality project.
-
-For plain-html: Return a single index.html with inline CSS and JS.
-For react/nextjs/vite/svelte/vue/astro: Return the ENTIRE project file structure as a JSON object:
+Return a JSON object with the project plan:
 {{
   "framework": "{framework}",
-  "setup_command": "the command to create the project (e.g. 'npx create-next-app@latest --typescript --tailwind --app')",
-  "files": {{
-    "path/to/file": "file content",
-    "path/to/another": "file content"
-  }},
-  "build_command": "the build command if needed",
-  "install_command": "npm install or equivalent"
+  "setup_command": "command to create project (e.g. 'npx create-next-app@latest project --typescript --tailwind --app') or empty for plain-html",
+  "install_command": "npm install or empty",
+  "build_command": "npm run build or empty",
+  "files": [
+    {{"path": "path/to/file", "description": "what this file does"}},
+    {{"path": "path/to/another", "description": "what this file does"}}
+  ]
 }}
 
-Important framework-specific rules:
-- For Next.js: ALWAYS add `output: 'export'` in next.config.js for static export. Use App Router.
-- For React (Vite): Use TypeScript, put source in src/
-- For all frameworks: use TypeScript when possible
+Rules:
+- List ALL files needed for the project
+- For plain-html: just one index.html
+- For React: src/App.tsx, src/main.tsx, index.html, package.json, vite.config.ts, etc.
+- For Next.js: app/layout.tsx, app/page.tsx, next.config.js, package.json, etc.
+- For Next.js: MUST include output: 'export' in next.config.js
+- Keep file count reasonable (5-15 files max)
+- Use TypeScript when possible
+- Make sure the project can be statically exported (no server-side features)
+"""
+
+FILE_PROMPT = """You are Bob, an autonomous website builder bot.
+Generate the file: {file_path}
+
+For project: {title}
+Description: {description}
+Framework: {framework}
+Features: {features}
+
+Other files in this project:
+{file_list}
+
+This file should:
+{file_description}
+
+Return ONLY the raw file content. No markdown fences, no explanations.
 
 Requirements:
 - Modern, beautiful design with smooth animations
@@ -255,15 +278,15 @@ Requirements:
 - Use a free Google Font
 - Include at least one interactive element
 - Color scheme should be cohesive and attractive
-- This should look like a real production website, not a tutorial example
-- For frameworks: use TypeScript, proper folder structure, components
-- Make sure the project can be statically exported (no server-side features)
+- This should look like a real production website
+- For TypeScript files: proper types, no `any`
+- Import paths must match the project structure
 """
 
 
-def generate_project(project: dict) -> dict:
-    """Generate the project. Returns {"type": "html", "content": "..."} or {"type": "framework", "setup": ..., "files": ...}"""
-    prompt = CODE_PROMPT.format(
+def generate_plan(project: dict) -> dict:
+    """Generate a build plan for the project."""
+    prompt = PLAN_PROMPT.format(
         title=project["title"],
         description=project["description"],
         framework=project.get("framework", "plain-html"),
@@ -271,11 +294,11 @@ def generate_project(project: dict) -> dict:
     )
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3.6-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.7,
-            max_output_tokens=16000,
+            max_output_tokens=2000,
         )
     )
 
@@ -283,20 +306,43 @@ def generate_project(project: dict) -> dict:
     if text.startswith("```"):
         text = text.split("\n", 1)[1]
         text = text.rsplit("```", 1)[0]
-    text = text.strip()
 
-    framework = project.get("framework", "plain-html")
+    return json.loads(text.strip())
 
-    if framework == "plain-html":
-        return {"type": "html", "content": text}
 
-    # Try to parse as JSON (framework project)
-    try:
-        data = json.loads(text)
-        return {"type": "framework", **data}
-    except json.JSONDecodeError:
-        # Fallback: save as HTML
-        return {"type": "html", "content": text}
+def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
+    """Generate a single file's content."""
+    # Build list of other files for context
+    other_files = []
+    for f in project.get("files", []):
+        if f["path"] != file_info["path"]:
+            other_files.append(f"{f['path']} - {f['description']}")
+
+    prompt = FILE_PROMPT.format(
+        file_path=file_info["path"],
+        title=project["title"],
+        description=project["description"],
+        framework=project.get("framework", "plain-html"),
+        features=", ".join(project["features"]),
+        file_list="\n".join(other_files) if other_files else "(first file)",
+        file_description=file_info["description"],
+    )
+
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.7,
+            max_output_tokens=8000,
+        )
+    )
+
+    text = response.text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1]
+        text = text.rsplit("```", 1)[0]
+
+    return text.strip()
 
 
 def generate_github_actions_workflow(project_name: str, framework: str) -> str:
@@ -404,20 +450,24 @@ jobs:
     return workflow
 
 
-def save_project_files(project_name: str, generated: dict):
-    """Save generated project to disk."""
+def save_project_files(project_name: str, plan: dict):
+    """Save generated project to disk, file by file."""
     project_dir = PROJECTS_DIR / project_name
     project_dir.mkdir(exist_ok=True)
 
-    if generated["type"] == "html":
-        (project_dir / "index.html").write_text(generated["content"], encoding="utf-8")
-        log.info(f"📁 Saved HTML to {project_dir / 'index.html'}")
+    framework = plan.get("framework", "plain-html")
 
-    elif generated["type"] == "framework":
-        framework = generated.get("framework", "react")
-
-        # Create the project from setup command if provided
-        setup = generated.get("setup_command", "")
+    # For plain HTML: generate single file
+    if framework == "plain-html":
+        file_info = plan["files"][0]  # just index.html
+        content = generate_file(file_info, plan, project_dir)
+        full_path = project_dir / file_info["path"]
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content, encoding="utf-8")
+        log.info(f"📁 Saved {file_info['path']}")
+    else:
+        # Framework: run setup first
+        setup = plan.get("setup_command", "")
         if setup:
             log.info(f"📦 Running setup: {setup}")
             subprocess.run(
@@ -429,15 +479,16 @@ def save_project_files(project_name: str, generated: dict):
                 timeout=120,
             )
 
-        # Write all files
-        for file_path, content in generated.get("files", {}).items():
-            full_path = project_dir / file_path
+        # Generate each file individually
+        for i, file_info in enumerate(plan["files"]):
+            log.info(f"  📄 [{i+1}/{len(plan['files'])}] {file_info['path']}")
+            content = generate_file(file_info, plan, project_dir)
+            full_path = project_dir / file_info["path"]
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content, encoding="utf-8")
-            log.info(f"  📄 {file_path}")
 
         # Install dependencies
-        install_cmd = generated.get("install_command", "")
+        install_cmd = plan.get("install_command", "")
         if install_cmd:
             log.info(f"📥 Installing: {install_cmd}")
             subprocess.run(
@@ -450,7 +501,7 @@ def save_project_files(project_name: str, generated: dict):
             )
 
         # Build if needed
-        build_cmd = generated.get("build_command", "")
+        build_cmd = plan.get("build_command", "")
         if build_cmd:
             log.info(f"🔨 Building: {build_cmd}")
             subprocess.run(
@@ -462,14 +513,13 @@ def save_project_files(project_name: str, generated: dict):
                 timeout=120,
             )
 
-        # Generate GitHub Actions workflow for framework projects
-        if framework != "plain-html":
-            workflows_dir = BOB_DIR / ".github" / "workflows"
-            workflows_dir.mkdir(parents=True, exist_ok=True)
-            workflow_file = workflows_dir / f"deploy-{project_name}.yml"
-            workflow_content = generate_github_actions_workflow(project_name, framework)
-            workflow_file.write_text(workflow_content, encoding="utf-8")
-            log.info(f"⚙️ Created workflow: {workflow_file}")
+        # Generate GitHub Actions workflow
+        workflows_dir = BOB_DIR / ".github" / "workflows"
+        workflows_dir.mkdir(parents=True, exist_ok=True)
+        workflow_file = workflows_dir / f"deploy-{project_name}.yml"
+        workflow_content = generate_github_actions_workflow(project_name, framework)
+        workflow_file.write_text(workflow_content, encoding="utf-8")
+        log.info(f"⚙️ Created workflow: {workflow_file}")
 
 
 # ─── Project Memory ──────────────────────────────────────────────────────
@@ -647,11 +697,7 @@ def build_project():
     log.info("🔧 Bob is thinking of something to build...")
     set_status("thinking", "Coming up with an idea...")
 
-    # Health checks
-    if not check_internet():
-        set_status("offline", "No internet connection")
-        return None
-
+    # Health checks - just try the Gemini API directly
     try:
         if not check_gemini_api():
             set_status("offline", "Gemini API not responding")
@@ -665,12 +711,18 @@ def build_project():
     log.info(f"💡 Idea: {idea['title']} — {idea['description']} ({idea.get('framework', 'html')})")
     set_status("building", idea["title"])
 
-    # 2. Generate project
-    log.info(f"🔨 Building {idea['title']} with {idea.get('framework', 'html')}...")
-    generated = generate_project(idea)
+    # 2. Generate plan
+    log.info(f"📋 Creating plan for {idea['title']} ({idea.get('framework', 'html')})...")
+    plan = generate_plan(idea)
+    plan["title"] = idea["title"]
+    plan["description"] = idea["description"]
+    plan["features"] = idea["features"]
+    file_count = len(plan.get("files", []))
+    log.info(f"📋 Plan: {file_count} files to generate")
 
-    # 3. Save files
-    save_project_files(idea["name"], generated)
+    # 3. Build file by file
+    log.info(f"🔨 Building {idea['title']}...")
+    save_project_files(idea["name"], plan)
 
     # 4. Commit and push
     set_status("pushing", idea["name"])

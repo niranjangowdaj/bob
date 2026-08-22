@@ -88,20 +88,21 @@ Right-click the widget to: View Logs, Open Projects, Start/Stop Bob, Quit.
 
 Your portfolio: **https://niranjangowdaj.github.io/bob/**
 
-## How Deployment Works
+## How Bob Builds
+
+Bob doesn't generate everything in one shot. He uses a **plan → build** approach:
+
+1. **Plan** — Gemini creates a project structure (which files, what each does)
+2. **Build** — Bob generates each file one by one, with context from the plan
+3. **Assemble** — installs dependencies, builds if needed
+4. **Push** — commits and pushes to GitHub
+
+This gives better quality code and stays within API limits.
 
 | Project Type | How it deploys |
 |-------------|----------------|
 | **Plain HTML** | Served directly by GitHub Pages |
 | **React/Next.js/Vite/etc** | GitHub Actions workflow builds + deploys |
-
-Bob automatically creates a **GitHub Actions workflow** for each framework project:
-
-1. Bob pushes code to `projects/my-project/`
-2. GitHub Actions detects changes in that folder
-3. Installs dependencies, builds the project
-4. Deploys to GitHub Pages
-5. Live at `https://niranjangowdaj.github.io/bob/projects/my-project/`
 
 **Important:** Enable GitHub Pages with **"GitHub Actions"** as the source (not branch).
 
