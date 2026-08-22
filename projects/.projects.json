@@ -10,10 +10,10 @@
       "Privacy-first local processing via browser-based WASM"
     ],
     "built_at": "2026-08-23T01:29:25.983439",
-    "status": "error",
+    "status": "reworked",
     "files_done": 0,
     "files_total": 0,
-    "updated_at": "2026-08-23T01:30:23.793321",
+    "updated_at": "2026-08-23T01:35:52.696822",
     "error": "'NoneType' object is not subscriptable"
   }
 ]
