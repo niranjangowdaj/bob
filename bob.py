@@ -160,7 +160,7 @@ def push_changes(message: str = ""):
 
     log.info(f"Pushing changes: {message}")
     run_git("add", "-A")
-    run_git("commit", "-m", message)
+    run_git("commit", "--author=Bob <bob@bot.local>", "-m", message)
     result = run_git("push", "origin", "main")
 
     if result.returncode == 0:
