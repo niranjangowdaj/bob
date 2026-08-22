@@ -31,5 +31,18 @@
     "files_done": 0,
     "files_total": 0,
     "updated_at": "2026-08-23T01:37:01.570147"
+  },
+  {
+    "name": "recipe-resizer-pro",
+    "title": "Recipe Resizer Pro",
+    "description": "An interactive utility that automatically recalculates ingredient measurements based on user-defined serving sizes or pan dimensions.",
+    "framework": "plain-html",
+    "features": [
+      "Dynamic unit conversion engine for metric and imperial measurements",
+      "Fraction-to-decimal converter for baking precision",
+      "Print-friendly view that hides UI elements for kitchen use"
+    ],
+    "built_at": "2026-08-23T01:51:02.296759",
+    "status": "in_progress"
   }
 ]

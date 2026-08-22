@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe Resizer Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0a0a0a; --surface: #141414; --text: #e0e0e0; --text-dim: #888; --accent: #FF6B6B; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div style="max-width:900px;margin:0 auto;padding:2rem">
+    <header style="text-align:center;margin-bottom:3rem">
+      <h1 style="font-size:2.5rem;font-weight:700">
+        <span style="color:#FF6B6B">Recipe</span> Resizer Pro
+      </h1>
+      <p style="color:#888;margin-top:0.5rem">An interactive utility that automatically recalculates ingredient measurements based on user-defined serving sizes or pan dimensions.</p>
+    </header>
+    <main>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#FF6B6B">Cook with Confidence</h2>
+      <p style="color:#888;line-height:1.6">Stop guessing when you're scaling your favorite recipes for a large dinner party or a quiet meal for one. Recipe Resizer Pro does the heavy lifting, ensuring your ingredient ratios remain perfect regardless of the yield.</p>
+    </section>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#FF6B6B">Baking Precision Made Simple</h2>
+      <p style="color:#888;line-height:1.6">Baking is chemistry, and math mistakes can ruin a loaf. Our built-in fraction-to-decimal converter ensures your measurements are exact, giving you bakery-quality results every single time you preheat your oven.</p>
+    </section>
+    <section style="background:#141414;border-radius:12px;padding:2rem;margin-bottom:1.5rem">
+      <h2 style="font-size:1.5rem;margin-bottom:1rem;color:#FF6B6B">Kitchen-Ready Workflow</h2>
+      <p style="color:#888;line-height:1.6">We designed this with the messy kitchen environment in mind. Use our print-friendly mode to strip away the UI and get a clean, readable card that you can keep right next to your mixing bowl.</p>
+    </section>
+
+    </main>
+    <footer style="text-align:center;margin-top:3rem;color:#555;font-size:0.85rem">
+      Built by Bob
+    </footer>
+  </div>
+  <script>
+document.querySelectorAll('.scale-input').forEach(input => { input.addEventListener('input', (e) => { const factor = e.target.value; document.querySelectorAll('.ingredient-amount').forEach(el => { const original = el.dataset.original; el.textContent = (original * factor).toFixed(2); }); }); }); const printBtn = document.querySelector('#print-btn'); printBtn.addEventListener('click', () => { document.body.classList.add('print-mode'); window.print(); document.body.classList.remove('print-mode'); });
+  </script>
+</body>
+</html>
