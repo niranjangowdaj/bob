@@ -10,11 +10,11 @@
       "Real-time data streaming dashboard"
     ],
     "built_at": "2026-08-23T00:30:05.731500",
-    "status": "in_progress",
-    "error": "Next.js build failed - missing 'use client' directive and other issues. Needs rework.",
-    "files_done": 4,
-    "files_total": 4,
-    "updated_at": "2026-08-23T01:01:20.188647"
+    "status": "error",
+    "error": "Build failed after 3 attempts: npm error code ETARGET\nnpm error notarget No matching version found for react-force-graph-3d@^2.1.0.\nnpm error notarget In most cases you or one of your dependencies are",
+    "files_done": 0,
+    "files_total": 0,
+    "updated_at": "2026-08-23T01:10:04.817337"
   },
   {
     "name": "orbit-focus",

@@ -7,3 +7,13 @@ logs/bob_status.json
 node_modules/
 .DS_Store
 *.log
+
+# Next.js build artifacts
+.next/
+out/
+
+# Vite/React build artifacts (keep dist/ for GitHub Pages deployment)
+# dist/ is NOT ignored - Bob commits it for deployment
+
+# Lock files (regenerated on install)
+package-lock.json

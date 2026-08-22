@@ -5,9 +5,17 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      'three': 'three'
+      'three': require.resolve('three'),
     };
     return config;
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'fonts.gstatic.com',
+      },
+    ],
   },
 };
 

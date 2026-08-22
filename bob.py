@@ -278,9 +278,12 @@ def init_git_repo():
 __pycache__/
 *.pyc
 logs/bob_status.json
+node_modules/
 .DS_Store
 *.log
-node_modules/
+.next/
+out/
+package-lock.json
 """)
 
     log.info("Git repo initialized")
@@ -461,47 +464,69 @@ def generate_plan(project: dict) -> dict:
                 raise
 
 
-def replan_with_error(old_plan: dict, error: str, project_name: str) -> dict:
-    """Generate a new plan based on build error."""
-    prompt = f"""You are Bob, an autonomous website builder bot.
-The project "{old_plan.get('title', project_name)}" failed to build.
+# Framework fallback order: try simpler options on failure
+FRAMEWORK_FALLBACKS = {
+    "nextjs": ["vite", "react", "plain-html"],
+    "react": ["vite", "plain-html"],
+    "vite": ["react", "plain-html"],
+    "svelte": ["vite", "plain-html"],
+    "vue": ["vite", "plain-html"],
+    "astro": ["vite", "plain-html"],
+}
 
-Previous plan:
-{json.dumps(old_plan, indent=2)[:1000]}
+
+def replan_with_error(old_plan: dict, error: str, project_name: str, attempt: int = 1) -> dict:
+    """Generate a new plan based build error. Gets simpler with each attempt."""
+    old_framework = old_plan.get("framework", "react")
+    fallbacks = FRAMEWORK_FALLBACKS.get(old_framework, ["plain-html"])
+    # Pick simpler framework each attempt
+    new_framework = fallbacks[min(attempt - 1, len(fallbacks) - 1)]
+
+    # Severity increases with attempts
+    if attempt == 1:
+        simplify = "Fix the specific error. Keep similar structure."
+    elif attempt == 2:
+        simplify = "Switch framework and use fewer dependencies. Max 5 files."
+    else:
+        simplify = "Build as PLAIN HTML with inline CSS/JS. No npm. Single index.html. Guaranteed to work."
+
+    prompt = f"""You are Bob. The project "{old_plan.get('title', project_name)}" failed to build.
 
 Build error:
-{error[:1500]}
+{error[:1000]}
 
-Create a NEW, simpler plan that avoids this error. Use different packages if needed.
-Return a JSON object with the new plan:
+Attempt {attempt}/3. Strategy: {simplify}
+Switch to framework: {new_framework}
+
+Create a NEW plan. Return JSON:
 {{
-  "framework": "{old_plan.get('framework', 'react')}",
-  "install_command": "npm install",
-  "build_command": "npm run build",
+  "framework": "{new_framework}",
+  "install_command": "npm install" or empty if plain-html,
+  "build_command": "npm run build" or empty if plain-html,
   "architecture": "Brief description",
-  "components": [{{"name": "comp", "description": "what it does", "files": [{{"path": "...", "description": "..."}}]}}],
+  "components": [{{"name": "comp", "description": "...", "files": [{{"path": "...", "description": "..."}}]}}],
   "config_files": [{{"path": "package.json", "description": "deps"}}],
   "files": [{{"path": "src/main.tsx", "description": "entry"}}]
 }}
 
-IMPORTANT:
-- Fix the error described above
-- Use fewer, simpler dependencies (max 3-4 npm packages)
-- Keep it under 10 files total
-- All dependencies must exist on npm with exact compatible versions
-- Do NOT include title/description/features in the JSON (they are passed separately)
+RULES:
+- Fix the error above
+- Use ONLY these safe packages: react, react-dom, react-router-dom, framer-motion, lucide-react
+- For plain-html: just one index.html with inline CSS/JS
+- Max {8 - attempt * 2} files
+- All npm packages must have EXISTING versions
 """
 
     problems = get_problems()
-    prompt = prompt.replace("{problems}", problems)
+    prompt += f"\nAVOID: {problems}"
 
-    for attempt in range(3):
+    for retry in range(3):
         try:
             text = _api_call(prompt, temperature=0.7)
             return _extract_json(text)
         except Exception as e:
-            log.warning(f"Replan attempt {attempt + 1} failed: {e}")
-            if attempt == 2:
+            log.warning(f"Replan attempt {retry + 1} failed: {e}")
+            if retry == 2:
                 raise
 
 
@@ -685,9 +710,9 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
         success, error = _run_command(install_cmd, project_dir, env)
         if not success:
             log.error(f"❌ npm install failed:\n{error}")
-            if attempt < 3:
+            if attempt < 5:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
-                new_plan = replan_with_error(plan, error, project_name)
+                new_plan = replan_with_error(plan, error, project_name, attempt)
                 # Carry over metadata from original plan
                 new_plan["title"] = plan.get("title", project_name)
                 new_plan["description"] = plan.get("description", "")
@@ -695,7 +720,7 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
                 save_project_files(project_name, new_plan, attempt + 1)
                 return
             else:
-                raise Exception(f"Build failed after 3 attempts: {error[:200]}")
+                raise Exception(f"Build failed after 5 attempts: {error[:200]}")
 
     # Build
     build_cmd = plan.get("build_command", "")
@@ -704,16 +729,16 @@ def save_project_files(project_name: str, plan: dict, attempt: int = 1):
         success, error = _run_command(build_cmd, project_dir)
         if not success:
             log.error(f"❌ npm build failed:\n{error}")
-            if attempt < 3:
+            if attempt < 5:
                 log.info(f"🔄 Retrying with new plan (attempt {attempt + 1}/3)...")
-                new_plan = replan_with_error(plan, error, project_name)
+                new_plan = replan_with_error(plan, error, project_name, attempt)
                 new_plan["title"] = plan.get("title", project_name)
                 new_plan["description"] = plan.get("description", "")
                 new_plan["features"] = plan.get("features", [])
                 save_project_files(project_name, new_plan, attempt + 1)
                 return
             else:
-                raise Exception(f"Build failed after 3 attempts: {error[:200]}")
+                raise Exception(f"Build failed after 5 attempts: {error[:200]}")
 
     # Generate GitHub Actions workflow
     workflows_dir = BOB_DIR / ".github" / "workflows"
@@ -1091,7 +1116,7 @@ def get_failed_projects() -> list:
 
 
 def rework_project(project: dict):
-    """Re-plan and rebuild a failed project from scratch."""
+    """Re-plan and rebuild a failed project from scratch with escalating simplification."""
     name = project["name"]
     log.info(f"🔄 Reworking failed project: {project['title']}")
     set_status("building", f"Reworking: {project['title']}")
@@ -1103,43 +1128,85 @@ def rework_project(project: dict):
         shutil.rmtree(project_dir)
         log.info(f"🗑️ Deleted old files for {name}")
 
-    # Generate new plan with error context
+    # Try up to 5 times, getting simpler each time
     old_error = project.get("error", "Unknown error")
-    prompt = f"""You are Bob. Rebuild this project with a SIMPLER approach.
+    old_framework = project.get("framework", "react")
+    fallbacks = FRAMEWORK_FALLBACKS.get(old_framework, ["plain-html"])
 
-Project: {project['title']}
-Description: {project['description']}
-Framework: {project.get('framework', 'react')}
+    for attempt in range(5):
+        # Pick framework: try fallbacks, then plain-html as last resort
+        if attempt < len(fallbacks):
+            use_framework = fallbacks[attempt]
+        else:
+            use_framework = "plain-html"
+
+        # Escalating simplification
+        if attempt == 0:
+            strategy = "Fix the specific error. Keep similar structure."
+            max_files = 10
+        elif attempt == 1:
+            strategy = "Switch to simpler framework. Reduce dependencies."
+            max_files = 8
+        elif attempt == 2:
+            strategy = "Minimal approach. Only essential features."
+            max_files = 5
+        elif attempt == 3:
+            strategy = "Ultra-simple. Basic HTML/CSS/JS only."
+            max_files = 3
+        else:
+            strategy = "PLAIN HTML with inline CSS/JS. Single index.html. Guaranteed to work."
+            max_files = 1
+
+        log.info(f"  📋 Attempt {attempt + 1}/5: {use_framework} ({strategy})")
+
+        prompt = f"""You are Bob. Rebuild "{project['title']}" - attempt {attempt + 1}/5.
+
 Previous error: {old_error[:500]}
+Framework: {use_framework}
+Strategy: {strategy}
+Max files: {max_files}
 
-Create a new, simpler plan. Use fewer dependencies. Under 8 files.
 Return JSON:
-{{"framework": "...", "install_command": "npm install", "build_command": "npm run build",
+{{"framework": "{use_framework}", "install_command": "npm install" or empty,
+ "build_command": "npm run build" or empty,
  "architecture": "...",
  "components": [{{"name": "...", "description": "...", "files": [{{"path": "...", "description": "..."}}]}}],
- "config_files": [{{"path": "...", "description": "..."}}],
- "files": [{{"path": "...", "description": "..."}}]}}
+ "config_files": [{{"path": "package.json", "description": "..."}}],
+ "files": [{{"path": "index.html", "description": "..."}}]}}
 
-Use ONLY stable, well-known packages. No experimental libs.
+RULES:
+- Fix the error above
+- Use ONLY: react, react-dom, framer-motion, lucide-react (or plain HTML)
+- All npm packages must have EXISTING versions on npm
 """
-    problems = get_problems()
-    prompt += f"\nAVOID: {problems}"
+        problems = get_problems()
+        prompt += f"\nAVOID: {problems}"
 
-    plan = None
-    for attempt in range(3):
         try:
             text = _api_call(prompt, temperature=0.7)
             plan = _extract_json(text)
-            break
+            plan["title"] = project["title"]
+            plan["description"] = project["description"]
+            plan["features"] = project.get("features", [])
+
+            # Try building
+            try:
+                save_project_files(name, plan)
+                log.info(f"✅ Rework succeeded on attempt {attempt + 1}")
+                update_project_status(name, "reworked")
+                return plan
+            except Exception as build_err:
+                old_error = str(build_err)[:500]
+                log.warning(f"  ❌ Attempt {attempt + 1} build failed: {old_error[:100]}")
+                # Delete and try again
+                if project_dir.exists():
+                    shutil.rmtree(project_dir)
+                continue
         except Exception as e:
-            log.warning(f"Replan attempt {attempt + 1} failed: {e}")
+            log.warning(f"  ❌ Plan generation failed: {e}")
+            continue
 
-    if not plan:
-        raise Exception("Could not generate new plan")
-
-    plan["title"] = project["title"]
-    plan["description"] = project["description"]
-    plan["features"] = project.get("features", [])
+    raise Exception(f"Could not rebuild {name} after 5 attempts")
 
     # Build with new plan
     save_project_files(name, plan)
