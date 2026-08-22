@@ -77,6 +77,26 @@ def check_internet() -> bool:
             return False
 
 
+def _extract_json(text: str) -> dict:
+    """Robustly extract JSON from AI response text."""
+    text = text.strip()
+    # Remove markdown fences
+    if "```" in text:
+        parts = text.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                return json.loads(part)
+    # Find first { and last }
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return json.loads(text[start:end+1])
+    raise json.JSONDecodeError("No JSON found in response", text, 0)
+
+
 def check_gemini_api() -> bool:
     try:
         client.models.generate_content(
@@ -207,30 +227,21 @@ def get_project_idea() -> dict:
         previous_projects=", ".join(previous_names) if previous_names else "none yet"
     )
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=1.0,
-            max_output_tokens=500,
-        )
-    )
-
-    text = response.text.strip()
-    # Robust JSON extraction
-    if "```" in text:
-        text = text.split("```")
-        for part in text:
-            part = part.strip()
-            if part.startswith("json"):
-                part = part[4:].strip()
-            if part.startswith("{"):
-                return json.loads(part)
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1:
-        return json.loads(text[start:end+1])
-    return json.loads(text)
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=1.0,
+                )
+            )
+            text = response.text.strip()
+            return _extract_json(text)
+        except (json.JSONDecodeError, Exception) as e:
+            log.warning(f"Attempt {attempt + 1} failed: {e}")
+            if attempt == 2:
+                raise
 
 
 # ─── Website Generation ──────────────────────────────────────────────────
@@ -302,30 +313,21 @@ def generate_plan(project: dict) -> dict:
         features=", ".join(project["features"]),
     )
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.7,
-            max_output_tokens=2000,
-        )
-    )
-
-    text = response.text.strip()
-    # Robust JSON extraction
-    if "```" in text:
-        text = text.split("```")
-        for part in text:
-            part = part.strip()
-            if part.startswith("json"):
-                part = part[4:].strip()
-            if part.startswith("{"):
-                return json.loads(part)
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1:
-        return json.loads(text[start:end+1])
-    return json.loads(text)
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                )
+            )
+            text = response.text.strip()
+            return _extract_json(text)
+        except (json.JSONDecodeError, Exception) as e:
+            log.warning(f"Plan attempt {attempt + 1} failed: {e}")
+            if attempt == 2:
+                raise
 
 
 def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
@@ -351,7 +353,6 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.7,
-            max_output_tokens=8000,
         )
     )
 
