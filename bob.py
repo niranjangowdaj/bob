@@ -278,12 +278,9 @@ def init_git_repo():
 __pycache__/
 *.pyc
 logs/bob_status.json
-node_modules/
-.next/
-dist/
-build/
 .DS_Store
 *.log
+node_modules/
 """)
 
     log.info("Git repo initialized")
@@ -541,50 +538,22 @@ def generate_file(file_info: dict, project: dict, project_dir: Path) -> str:
     return text.strip()
 
 
-def generate_github_actions_workflow(project_name: str, framework: str) -> str:
-    """Generate a GitHub Actions workflow for framework projects."""
-    # Determine build output directory and commands based on framework
-    configs = {
-        "react": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npm run build",
-            "output_dir": "dist",
-        },
-        "nextjs": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npx next build && npx next export",
-            "output_dir": "out",
-        },
-        "vite": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npm run build",
-            "output_dir": "dist",
-        },
-        "astro": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npm run build",
-            "output_dir": "dist",
-        },
-        "svelte": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npm run build",
-            "output_dir": "build",
-        },
-        "vue": {
-            "node": "18",
-            "install": "npm install",
-            "build": "npm run build",
-            "output_dir": "dist",
-        },
-    }
+def get_build_output_dir(framework: str) -> str:
+    """Get the build output directory for a framework."""
+    return {
+        "react": "dist",
+        "vite": "dist",
+        "nextjs": "out",
+        "astro": "dist",
+        "svelte": "build",
+        "vue": "dist",
+    }.get(framework, "dist")
 
-    config = configs.get(framework, configs["react"])
-    base_path = f"/projects/{project_name}/"
+
+def generate_github_actions_workflow(project_name: str, framework: str) -> str:
+    """Generate a GitHub Actions workflow that deploys pre-built output.
+    Bob builds locally, so the workflow just uploads the built files."""
+    output_dir = get_build_output_dir(framework)
 
     workflow = f"""name: Deploy {project_name}
 
@@ -592,7 +561,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'projects/{project_name}/**'
+      - 'projects/{project_name}/{output_dir}/**'
   workflow_dispatch:
 
 permissions:
@@ -605,24 +574,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{{{ steps.deployment.outputs.page_url }}}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: {config["node"]}
-
-      - name: Install dependencies
-        working-directory: projects/{project_name}
-        run: {config["install"]}
-
-      - name: Build
-        working-directory: projects/{project_name}
-        run: {config["build"]}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -630,15 +589,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: projects/{project_name}/{config["output_dir"]}
+          path: projects/{project_name}/{output_dir}
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{{{ steps.deployment.outputs.page_url }}}}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

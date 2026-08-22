@@ -45,6 +45,9 @@
     ],
     "built_at": "2026-08-23T00:51:12.250374",
     "status": "error",
-    "error": "Vite build failed - could not resolve './app.css' from 'src/main.ts'. Missing CSS file in project structure."
+    "error": "Build failed after 3 attempts: 1:06:05 AM [vite-plugin-svelte] failed to import config /Users/I528969/Desktop/Projects/bob/projects/chroma-chord/svelte.config.js\nError [ERR_MODULE_NOT_FOUND]: Cannot f",
+    "files_done": 0,
+    "files_total": 0,
+    "updated_at": "2026-08-23T01:06:05.308372"
   }
 ]

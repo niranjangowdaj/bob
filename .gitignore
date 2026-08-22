@@ -5,8 +5,5 @@ __pycache__/
 *.pyc
 logs/bob_status.json
 node_modules/
-.next/
-dist/
-build/
 .DS_Store
 *.log
